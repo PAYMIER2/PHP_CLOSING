@@ -1,0 +1,2496 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PHP Closing — Deposit & Withdrawal Aggregator</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+
+  <script>
+    // Apply theme ASAP to avoid flash
+    (function() {
+      try {
+        const saved = localStorage.getItem('phpClosingTheme');
+        const dark = saved ? saved === 'dark' : false;
+        if (dark) document.documentElement.classList.add('dark');
+      } catch (e) {}
+    })();
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    :root {
+      --bg-base: #f4f6f8;
+      --surface: #ffffff;
+      --surface-2: #f8fafc;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: #e2e8f0;
+      --accent: #0d9488;
+      --accent-hover: #0f766e;
+      --header-bg: rgba(255,255,255,0.85);
+      --shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+      --input-bg: #ffffff;
+      --map-bg: #f8fafc;
+      --danger-bg: #ffffff;
+      --danger-border: #fecdd3;
+      --danger-text: #e11d48;
+      --scroll-thumb: #cbd5e1;
+      --btn-primary-fg: #ffffff;
+    }
+    html.dark {
+      --bg-base: #0b1220;
+      --surface: #111827;
+      --surface-2: #1a2332;
+      --ink: #e2e8f0;
+      --muted: #94a3b8;
+      --line: #243044;
+      --accent: #2dd4bf;
+      --accent-hover: #14b8a6;
+      --header-bg: rgba(17, 24, 39, 0.9);
+      --shadow: 0 1px 2px rgba(0,0,0,0.35);
+      --input-bg: #0f172a;
+      --map-bg: #0f172a;
+      --danger-bg: #1c1215;
+      --danger-border: #7f1d1d;
+      --danger-text: #fb7185;
+      --scroll-thumb: #334155;
+      --btn-primary-fg: #042f2e;
+    }
+    body {
+      color: var(--ink);
+      background:
+        radial-gradient(1000px 500px at 8% -10%, rgba(13,148,136,0.10), transparent 55%),
+        radial-gradient(800px 420px at 100% 0%, rgba(45,212,191,0.05), transparent 50%),
+        var(--bg-base);
+    }
+    html.dark body {
+      background:
+        radial-gradient(1000px 500px at 8% -10%, rgba(45,212,191,0.08), transparent 55%),
+        radial-gradient(800px 420px at 100% 0%, rgba(15,23,42,0.55), transparent 50%),
+        var(--bg-base);
+    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 999px; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+    }
+    .app-header {
+      background: var(--header-bg);
+      border-bottom: 1px solid var(--line);
+    }
+    .drop-zone {
+      border: 1.5px dashed var(--line);
+      background: var(--surface-2);
+      transition: border-color .15s, background .15s;
+    }
+    .drop-zone:hover, .drop-zone.drag-active {
+      border-color: var(--accent);
+      background: rgba(13,148,136,0.08);
+    }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 0.375rem;
+      font-weight: 600; font-size: 0.75rem; line-height: 1; border-radius: 10px;
+      padding: 0.55rem 0.8rem; transition: background .15s, border-color .15s, color .15s;
+      white-space: nowrap;
+    }
+    .btn-primary { background: var(--accent); color: var(--btn-primary-fg); }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-secondary { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
+    .btn-secondary:hover { background: var(--surface-2); }
+    .btn-ghost { background: transparent; color: var(--muted); }
+    .btn-ghost:hover { background: var(--surface-2); color: var(--ink); }
+    .btn-danger { background: var(--danger-bg); color: var(--danger-text); border: 1px solid var(--danger-border); }
+    .input-field {
+      width: 100%; background: var(--input-bg); border: 1px solid var(--line); color: var(--ink);
+      border-radius: 10px; padding: 0.5rem 0.75rem; font-size: 0.75rem; outline: none;
+    }
+    .input-field:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(13,148,136,0.18); }
+    .map-input {
+      width: 100%; background: var(--map-bg); border: 1px solid transparent;
+      color: var(--ink);
+      border-radius: 8px; padding: 0.4rem 0.55rem; font-size: 0.75rem;
+      font-family: "JetBrains Mono", ui-monospace, monospace; font-weight: 600; outline: none;
+    }
+    .map-input.map-accent { color: var(--accent); }
+    .map-input.map-ok { color: #059669; }
+    .map-input.map-bad { color: #e11d48; }
+    html.dark .map-input.map-ok { color: #34d399; }
+    html.dark .map-input.map-bad { color: #fb7185; }
+    .map-input:hover { border-color: var(--line); background: var(--input-bg); }
+    .map-input:focus { border-color: var(--accent); background: var(--input-bg); box-shadow: 0 0 0 3px rgba(13,148,136,0.14); }
+    .input-field::placeholder { color: var(--muted); opacity: 0.8; }
+    .stat-value { font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+    .text-ink { color: var(--ink); }
+    .text-muted { color: var(--muted); }
+    .border-line { border-color: var(--line); }
+    .bg-surface-2 { background: var(--surface-2); }
+    .modal-panel { background: var(--surface); border-color: var(--line); color: var(--ink); }
+    .modal-footer { background: var(--surface-2); border-color: var(--line); }
+    .file-chip-dp { background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.28); }
+    .file-chip-wd { background: rgba(244,63,94,0.12); border: 1px solid rgba(244,63,94,0.28); }
+    .tab-bar { background: var(--surface-2); }
+    .tab-active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+    .tab-idle { color: var(--muted); }
+    .tab-idle:hover { color: var(--ink); }
+    .table-head-row {
+      background: var(--surface-2);
+      color: var(--muted);
+      border-bottom: 1px solid var(--line);
+    }
+    .table-head-row th {
+      transition: background .15s;
+    }
+    .table-head-row th:hover {
+      background: rgba(13, 148, 136, 0.08);
+    }
+    html.dark .table-head-row th:hover {
+      background: rgba(45, 212, 191, 0.08);
+    }
+    .table-body-row {
+      border-bottom: 1px solid var(--line);
+      transition: background .15s;
+    }
+    .table-body-row:hover {
+      background: var(--surface-2);
+    }
+    html.dark .table-body-row:hover {
+      background: #1a2332;
+    }
+  </style>
+</head>
+<body class="h-full flex flex-col font-sans antialiased selection:bg-teal-600 selection:text-white">
+
+  <!-- Top Navigation Header -->
+  <header class="app-header sticky top-0 z-30 backdrop-blur-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3 min-w-0">
+        <div class="h-8 w-8 rounded-lg bg-teal-600 flex items-center justify-center text-white shrink-0">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+        </div>
+        <div class="min-w-0">
+          <h1 id="appTitleHeading" class="text-sm font-bold text-ink leading-tight truncate">PHP Closing</h1>
+          <p class="text-[10px] text-muted truncate">Deposit & withdrawal settlement</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <button id="themeToggleBtn" onclick="toggleTheme()" class="btn btn-secondary px-2.5" title="Toggle dark mode" aria-label="Toggle dark mode">
+          <svg id="iconSun" class="w-4 h-4 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+          <svg id="iconMoon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+        </button>
+        <button onclick="openAccountModal()" class="btn btn-secondary border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300 font-bold hover:bg-indigo-50 dark:hover:bg-indigo-950/50">
+          <svg class="w-3.5 h-3.5 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+          <span id="headerAccountLabel">Currency: PHP</span>
+        </button>
+        <button onclick="requestSettingsAccess()" class="btn btn-primary flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          <span>Settings</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-4">
+    
+    <!-- Compact upload bars -->
+    <section class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+      <div class="card px-3 py-2">
+        <div class="flex items-center gap-2 min-h-[36px]">
+          <span class="h-2 w-2 rounded-full bg-emerald-500 shrink-0"></span>
+          <div class="shrink-0 flex items-center gap-1.5 min-w-[78px]">
+            <h2 class="text-xs font-bold text-ink">Deposit</h2>
+            <span class="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 px-1 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">DP</span>
+          </div>
+          <div class="flex-1 drop-zone rounded-md px-2.5 py-1.5 cursor-pointer flex items-center gap-2 min-w-0" id="depositDropZone" onclick="document.getElementById('depositFileInput').click()">
+            <input type="file" id="depositFileInput" accept=".csv, .txt" class="hidden" onchange="handleDepositFileSelect(event)">
+            <svg class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+            <span class="text-[11px] text-muted truncate">Drop CSV or click</span>
+          </div>
+        </div>
+        <div id="depositFileInfoBanner" class="hidden mt-1.5 file-chip-dp rounded-md px-2 py-1 flex items-center justify-between gap-2">
+          <div class="truncate min-w-0">
+            <p class="text-[11px] font-semibold text-emerald-800 dark:text-emerald-300 truncate" id="depositFileNameText">deposit.csv</p>
+            <p class="text-[10px] text-emerald-700 dark:text-emerald-400" id="depositFileDetailsText">0 rows</p>
+          </div>
+          <button onclick="resetDepositData()" class="btn btn-ghost !py-0.5 !px-1.5 text-emerald-700 dark:text-emerald-300 shrink-0">Clear</button>
+        </div>
+      </div>
+
+      <div class="card px-3 py-2">
+        <div class="flex items-center gap-2 min-h-[36px]">
+          <span class="h-2 w-2 rounded-full bg-rose-500 shrink-0"></span>
+          <div class="shrink-0 flex items-center gap-1.5 min-w-[78px]">
+            <h2 class="text-xs font-bold text-ink">Withdrawal</h2>
+            <span class="text-[9px] font-bold text-rose-600 dark:text-rose-400 px-1 py-0.5 rounded border border-rose-200 dark:border-rose-800">WD</span>
+          </div>
+          <div class="flex-1 drop-zone rounded-md px-2.5 py-1.5 cursor-pointer flex items-center gap-2 min-w-0" id="withdrawalDropZone" onclick="document.getElementById('withdrawalFileInput').click()">
+            <input type="file" id="withdrawalFileInput" accept=".csv, .txt" class="hidden" onchange="handleWithdrawalFileSelect(event)">
+            <svg class="w-3.5 h-3.5 text-rose-600 dark:text-rose-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+            <span class="text-[11px] text-muted truncate">Drop CSV or click</span>
+          </div>
+        </div>
+        <div id="withdrawalFileInfoBanner" class="hidden mt-1.5 file-chip-wd rounded-md px-2 py-1 flex items-center justify-between gap-2">
+          <div class="truncate min-w-0">
+            <p class="text-[11px] font-semibold text-rose-800 dark:text-rose-300 truncate" id="withdrawalFileNameText">withdrawal.csv</p>
+            <p class="text-[10px] text-rose-700 dark:text-rose-400" id="withdrawalFileDetailsText">0 rows</p>
+          </div>
+          <button onclick="resetWithdrawalData()" class="btn btn-ghost !py-0.5 !px-1.5 text-rose-700 dark:text-rose-300 shrink-0">Clear</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Metrics -->
+    <section id="metricsPanel" class="hidden grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+      <div class="card p-3">
+        <p class="text-[11px] font-semibold text-muted">Total Deposit</p>
+        <h3 class="stat-value text-lg font-extrabold text-emerald-600 dark:text-emerald-400 mt-1" id="statGrandTotalDeposit">0.00</h3>
+        <p class="text-[11px] text-muted mt-1">Fee <span id="statTotalDepositFee" class="font-semibold text-ink">0.00</span></p>
+      </div>
+      <div class="card p-3">
+        <p class="text-[11px] font-semibold text-muted">Total Withdrawal</p>
+        <h3 class="stat-value text-lg font-extrabold text-rose-600 dark:text-rose-400 mt-1" id="statGrandTotalWithdrawal">0.00</h3>
+        <p class="text-[11px] text-muted mt-1">Fee <span id="statTotalWithdrawalFee" class="font-semibold text-ink">0.00</span></p>
+      </div>
+      <div class="card p-3">
+        <p class="text-[11px] font-semibold text-muted">Total Gateway Fees</p>
+        <h3 class="stat-value text-lg font-extrabold text-amber-600 dark:text-amber-400 mt-1" id="statTotalFees">0.00</h3>
+        <p class="text-[11px] text-muted mt-1">DP + WD fees</p>
+      </div>
+      <div class="card p-3">
+        <p class="text-[11px] font-semibold text-muted">Net Settlement</p>
+        <h3 class="stat-value text-lg font-extrabold text-teal-700 dark:text-teal-400 mt-1" id="statNetBalance">0.00</h3>
+        <p class="text-[11px] text-muted mt-1">Dep − Wth − Fees</p>
+      </div>
+    </section>
+
+    <!-- Table Output -->
+    <section id="resultsPanel" class="hidden">
+      <div class="card overflow-hidden flex flex-col">
+        <div class="p-4 sm:p-5 border-b border-line space-y-4">
+          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <div>
+              <h3 class="text-sm font-bold text-ink">Settlement breakdown</h3>
+              <p class="text-[11px] text-muted mt-0.5">Grouped by gateway and mapped label</p>
+            </div>
+            <div class="tab-bar flex items-center p-1 rounded-xl shrink-0 self-start">
+              <button id="tabBtnCombined" onclick="setActiveTab('COMBINED')" class="px-3 py-1.5 text-xs font-semibold rounded-lg transition tab-active">Combined</button>
+              <button id="tabBtnDeposit" onclick="setActiveTab('DEPOSIT')" class="px-3 py-1.5 text-xs font-semibold rounded-lg transition tab-idle">Deposit</button>
+              <button id="tabBtnWithdrawal" onclick="setActiveTab('WITHDRAWAL')" class="px-3 py-1.5 text-xs font-semibold rounded-lg transition tab-idle">Withdrawal</button>
+            </div>
+          </div>
+
+          <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+            <input type="text" id="tableFilterInput" onkeyup="filterGroupTable()" placeholder="Search gateway or label…" class="input-field sm:max-w-xs">
+            <div class="flex flex-wrap items-center gap-2 sm:ml-auto">
+              <button onclick="exportSummaryCSV()" class="btn btn-secondary">Export CSV</button>
+              <button onclick="copyExcelFormat()" class="btn btn-secondary">Copy Excel</button>
+              <button onclick="openCountReportModal()" class="btn btn-primary">PG Count</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="px-4 sm:px-5 py-2 bg-surface-2 border-b border-line flex items-center gap-2 overflow-x-auto text-xs" id="prefixPillsContainer">
+          <span class="font-semibold text-muted shrink-0">Mapped Label</span>
+          <div id="prefixPillsList" class="flex items-center gap-1.5 overflow-x-auto"></div>
+        </div>
+
+        <div class="overflow-x-auto flex-1">
+          <table class="w-full text-left border-collapse" id="groupedTable">
+            <thead id="groupedTableHead"></thead>
+            <tbody id="groupedTableBody" class="divide-y text-xs font-medium text-ink" style="border-color: var(--line)"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Toast -->
+  <div id="toast" class="fixed bottom-5 right-5 z-[60] translate-y-20 opacity-0 transition-all duration-300 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl text-xs font-medium">
+    <span id="toastMessage">Notification</span>
+  </div>
+
+  <!-- Confirm Modal -->
+  <div id="confirmModal" class="fixed inset-0 z-[70] hidden items-center justify-center p-4" style="background:rgba(0,0,0,.55)">
+    <div class="modal-panel rounded-2xl shadow-2xl border w-full max-w-sm overflow-hidden">
+      <div class="p-5">
+        <div class="h-10 w-10 rounded-full bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 flex items-center justify-center mb-3">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+        </div>
+        <h3 id="confirmTitle" class="text-sm font-bold text-ink">Confirm</h3>
+        <p id="confirmMessage" class="text-xs text-muted mt-1.5 leading-relaxed">Are you sure?</p>
+      </div>
+      <div class="modal-footer px-5 py-4 border-t flex items-center justify-end gap-2">
+        <button id="confirmCancelBtn" class="btn btn-secondary">Cancel</button>
+        <button id="confirmOkBtn" class="btn btn-danger">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Select Currency Modal -->
+  <div id="accountModal" class="fixed inset-0 z-50 hidden backdrop-blur-sm flex items-center justify-center p-4" style="background:rgba(0,0,0,.55)">
+    <div class="modal-panel rounded-2xl shadow-2xl border w-full max-w-md overflow-hidden flex flex-col max-h-[85vh]">
+      <div class="p-6 space-y-4 overflow-y-auto flex-1">
+        <h3 class="text-base font-bold text-ink">Select Currency</h3>
+
+        <!-- Search Filter Box -->
+        <div class="border border-line rounded-xl p-4 space-y-2 bg-surface-2/40">
+          <label class="block text-[11px] font-semibold text-muted">Name</label>
+          <div class="flex items-center gap-3">
+            <input type="text" id="accountSearchInput" placeholder="" onkeyup="if(event.key==='Enter') searchAccount()" class="input-field max-w-xs !bg-surface">
+            <button onclick="clearAccountSearch()" class="text-xs font-semibold text-muted hover:text-ink px-2 py-1 transition">Clear</button>
+            <button onclick="searchAccount()" class="btn bg-slate-800 text-white hover:bg-slate-900 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-white px-4 py-2 text-xs font-bold rounded-lg shadow-sm">Search</button>
+          </div>
+        </div>
+
+        <!-- Account Table List -->
+        <div class="border border-line rounded-xl overflow-hidden">
+          <div class="bg-surface-2 px-4 py-2 border-b border-line text-xs font-bold text-muted">
+            Name
+          </div>
+          <div id="accountModalList" class="divide-y divide-line text-xs"></div>
+        </div>
+      </div>
+
+      <div class="p-4 border-t border-line modal-footer flex items-center justify-end">
+        <button onclick="closeAccountModal()" class="btn bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-2 text-xs rounded-xl shadow transition">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Security PIN Modal with Numeric Keypad -->
+  <div id="pinModal" class="fixed inset-0 z-[80] hidden backdrop-blur-sm flex items-center justify-center p-4" style="background:rgba(0,0,0,.55)">
+    <div class="modal-panel rounded-2xl shadow-2xl border w-full max-w-xs overflow-hidden flex flex-col">
+      <div class="p-5 text-center space-y-3">
+        <div class="h-11 w-11 rounded-full bg-teal-50 dark:bg-teal-950/50 text-teal-600 dark:text-teal-400 flex items-center justify-center mx-auto">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-ink">Enter Security PIN</h3>
+          <p class="text-[11px] text-muted mt-0.5">Type PIN to access Settings</p>
+        </div>
+
+        <div class="pt-1 space-y-2">
+          <input type="password" id="pinInputField" maxlength="8" placeholder="••••" readonly
+                 class="input-field text-center text-xl tracking-[0.4em] font-mono !py-2.5 max-w-[180px] mx-auto cursor-default select-none bg-surface-2"
+                 onkeyup="if(event.key==='Enter') verifySettingsPin()">
+          <p id="pinErrorMessage" class="text-xs text-rose-500 font-semibold hidden">Incorrect PIN. Please try again.</p>
+        </div>
+
+        <!-- Numeric Keypad Grid -->
+        <div class="grid grid-cols-3 gap-2 pt-1 max-w-[210px] mx-auto select-none">
+          <button type="button" onclick="pinKeypadPress('1')" class="btn btn-secondary !py-2.5 text-sm font-bold active:scale-95 shadow-sm">1</button>
+          <button type="button" onclick="pinKeypadPress('2')" class="btn btn-secondary !py-2.5 text-sm font-bold active:scale-95 shadow-sm">2</button>
+          <button type="button" onclick="pinKeypadPress('3')" class="btn btn-secondary !py-2.5 text-sm font-bold active:scale-95 shadow-sm">3</button>
+          <button type="button" onclick="pinKeypadPress('4')" class="btn btn-secondary !py-2.5 text-sm font-bold active:scale-95 shadow-sm">4</button>
+          <button type="button" onclick="pinKeypadPress('5')" class="btn btn-secondary !py-2.5 text-sm font-bold active:scale-95 shadow-sm">5</button>
+          <button type="button" onclick="pinKeypadPress('6')" class="btn btn-secondary !py-2.5 text-sm font-bold active:scale-95 shadow-sm">6</button>
+          <button type="button" onclick="pinKeypadPress('7')" class="btn btn-secondary !py-2.5 text-sm font-bold active:scale-95 shadow-sm">7</button>
+          <button type="button" onclick="pinKeypadPress('8')" class="btn btn-secondary !py-2.5 text-sm font-bold active:scale-95 shadow-sm">8</button>
+          <button type="button" onclick="pinKeypadPress('9')" class="btn btn-secondary !py-2.5 text-sm font-bold active:scale-95 shadow-sm">9</button>
+          <button type="button" onclick="pinKeypadClear()" class="btn btn-ghost !py-2.5 text-xs font-semibold text-muted hover:text-rose-500 active:scale-95" title="Clear">C</button>
+          <button type="button" onclick="pinKeypadPress('0')" class="btn btn-secondary !py-2.5 text-sm font-bold active:scale-95 shadow-sm">0</button>
+          <button type="button" onclick="pinKeypadBackspace()" class="btn btn-ghost !py-2.5 text-xs font-semibold text-muted hover:text-ink active:scale-95" title="Backspace">
+            <svg class="w-4 h-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M3 12l6.414-6.414A2 2 0 0110.828 5H20a2 2 0 012 2v10a2 2 0 01-2 2h-9.172a2 2 0 01-1.414-.586L3 12z"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="p-4 border-t border-line modal-footer flex items-center justify-between gap-2">
+        <button onclick="closePinModal()" class="btn btn-secondary flex-1">Cancel</button>
+        <button onclick="verifySettingsPin()" class="btn btn-primary flex-1">Unlock</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Unified Settings Modal (Mappings & Fees) -->
+  <div id="settingsModal" class="fixed inset-0 z-50 hidden backdrop-blur-sm flex items-center justify-center p-4" style="background:rgba(0,0,0,.55)">
+    <div class="modal-panel rounded-2xl shadow-2xl border w-full max-w-4xl overflow-hidden flex flex-col max-h-[88vh]">
+      <!-- Settings Header with Tabs -->
+      <div class="p-4 sm:p-5 border-b border-line flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5">
+          <div class="h-9 w-9 rounded-lg bg-teal-600 flex items-center justify-center text-white shrink-0">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-base font-bold text-ink">Settings</h3>
+              <span id="settingsAccountBadge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">PHP</span>
+            </div>
+            <p class="text-xs text-muted mt-0.5">Manage Mappings & Fee rules for current currency</p>
+          </div>
+        </div>
+
+        <!-- Navigation Tabs inside Settings -->
+        <div class="flex items-center gap-2">
+          <div class="tab-bar flex items-center p-1 rounded-xl shrink-0">
+            <button id="settingsTabMappings" onclick="switchSettingsTab('mappings')" class="px-3.5 py-1.5 text-xs font-bold rounded-lg transition tab-active flex items-center gap-1.5">
+              Mappings
+              <span id="mappingCountBadge" class="px-1.5 py-0.2 rounded-md bg-teal-100 dark:bg-teal-900/60 text-[10px] font-bold text-teal-800 dark:text-teal-200">16</span>
+            </button>
+            <button id="settingsTabFees" onclick="switchSettingsTab('fees')" class="px-3.5 py-1.5 text-xs font-bold rounded-lg transition tab-idle flex items-center gap-1.5">
+              Fee Schedule
+              <span id="feeCountBadge" class="px-1.5 py-0.2 rounded-md bg-teal-100 dark:bg-teal-900/60 text-[10px] font-bold text-teal-800 dark:text-teal-200">21</span>
+            </button>
+          </div>
+          <button onclick="closeSettingsModal()" class="btn btn-ghost p-2 text-muted hover:text-ink">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Settings Content Body -->
+      <div class="p-5 overflow-y-auto space-y-6 flex-1">
+        
+        <!-- Tab 1: Mappings Section -->
+        <div id="settingsMappingsSection" class="space-y-6">
+          <div>
+            <h4 class="text-xs font-bold text-ink mb-2">Mapped Label (Col A prefix)</h4>
+            <div class="bg-surface-2 border border-line p-3.5 rounded-xl flex flex-col sm:flex-row items-end gap-3 mb-3">
+              <div class="flex-1 w-full">
+                <label class="block text-[11px] font-semibold text-muted mb-1">Mapped Label</label>
+                <input type="text" id="newMapTo" placeholder="e.g. LUCKON" class="input-field font-mono uppercase">
+              </div>
+              <div class="flex-1 w-full">
+                <label class="block text-[11px] font-semibold text-muted mb-1">Raw Prefix</label>
+                <input type="text" id="newMapFrom" placeholder="e.g. LUCKO" class="input-field font-mono uppercase">
+              </div>
+              <button onclick="addPrefixMappingRule()" class="btn btn-primary w-full sm:w-auto">Add</button>
+            </div>
+            <div class="border border-slate-200 rounded-xl overflow-hidden">
+              <table class="w-full text-left text-xs border-collapse">
+                <thead class="table-head-row text-[11px] font-semibold">
+                  <tr>
+                    <th class="py-2.5 px-3 w-12 text-center">#</th>
+                    <th class="py-2.5 px-3">Mapped Label</th>
+                    <th class="py-2.5 px-3">Raw Prefix</th>
+                    <th class="py-2.5 px-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="mappingModalTableBody" class="divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div>
+            <h4 class="text-xs font-bold text-ink mb-1">Gateway display names</h4>
+            <p class="text-[11px] text-muted mb-2">Display only — fees still use original gateway names</p>
+            <div class="bg-surface-2 border border-line p-3.5 rounded-xl flex flex-col sm:flex-row items-end gap-3 mb-3">
+              <div class="flex-1 w-full">
+                <label class="block text-[11px] font-semibold text-muted mb-1">Display Name</label>
+                <input type="text" id="newGatewayMapTo" placeholder="e.g. ApolloPay" class="input-field font-mono">
+              </div>
+              <div class="flex-1 w-full">
+                <label class="block text-[11px] font-semibold text-muted mb-1">Raw Gateway</label>
+                <input type="text" id="newGatewayMapFrom" placeholder="e.g. Apollo Pay" class="input-field font-mono">
+              </div>
+              <button onclick="addGatewayMappingRule()" class="btn btn-primary w-full sm:w-auto">Add</button>
+            </div>
+            <div class="border border-slate-200 rounded-xl overflow-hidden">
+              <table class="w-full text-left text-xs border-collapse">
+                <thead class="table-head-row text-[11px] font-semibold">
+                  <tr>
+                    <th class="py-2.5 px-3 w-12 text-center">#</th>
+                    <th class="py-2.5 px-3">Display Name</th>
+                    <th class="py-2.5 px-3">Raw Gateway</th>
+                    <th class="py-2.5 px-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="gatewayMappingModalTableBody" class="divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Fee Schedule Section -->
+        <div id="settingsFeesSection" class="hidden space-y-5">
+          <div>
+            <h4 class="text-xs font-bold text-ink mb-1">Fee Rules</h4>
+            <p class="text-[11px] text-muted mb-3">Fee = Amount × (% / 100) + Flat</p>
+          </div>
+          <div class="bg-surface-2 border border-line p-4 rounded-xl grid grid-cols-1 sm:grid-cols-6 gap-3 items-end">
+            <div class="sm:col-span-2">
+              <label class="block text-[11px] font-semibold text-muted mb-1">Payment Gateway</label>
+              <input type="text" id="newFeeGateway" placeholder="e.g. Apollo Pay" class="input-field">
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-muted mb-1">Method</label>
+              <input type="text" id="newFeeMethod" placeholder="e.g. Gcash" class="input-field">
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-muted mb-1">Dep %</label>
+              <input type="number" step="0.01" id="newFeeDepRate" placeholder="1.0" class="input-field">
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-muted mb-1">Dep Flat</label>
+              <input type="number" step="0.01" id="newFeeDepFlat" placeholder="0.0" class="input-field">
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-muted mb-1">Wd %</label>
+              <input type="number" step="0.01" id="newFeeWdRate" placeholder="0.0" class="input-field">
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-muted mb-1">Wd Flat</label>
+              <input type="number" step="0.01" id="newFeeWdFlat" placeholder="0.0" class="input-field">
+            </div>
+            <div class="sm:col-span-6 flex justify-end">
+              <button onclick="addFeeRule()" class="btn btn-primary">Add fee rule</button>
+            </div>
+          </div>
+
+          <div class="border border-slate-200 rounded-xl overflow-hidden">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead class="table-head-row text-[11px] font-semibold">
+                <tr>
+                  <th class="py-2.5 px-3">Gateway</th>
+                  <th class="py-2.5 px-3">Method</th>
+                  <th class="py-2.5 px-3 text-right">Dep %</th>
+                  <th class="py-2.5 px-3 text-right">Dep Flat</th>
+                  <th class="py-2.5 px-3 text-right">Wd %</th>
+                  <th class="py-2.5 px-3 text-right">Wd Flat</th>
+                  <th class="py-2.5 px-3 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody id="feeModalTableBody" class="divide-y divide-slate-100 font-medium"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Settings Modal Footer -->
+      <div class="p-4 border-t border-line modal-footer flex items-center justify-between gap-2">
+        <button onclick="resetCurrentSettingsTab()" class="btn btn-ghost text-muted">Reset defaults</button>
+        <div class="flex items-center gap-2">
+          <button onclick="closeSettingsModal()" class="btn btn-secondary">Close</button>
+          <button onclick="saveAndApplySettings()" class="btn btn-primary">Apply</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Global Application State
+    let depositCSVData = [];
+    let withdrawalCSVData = [];
+    let depositCSVHeaders = [];
+    let withdrawalCSVHeaders = [];
+    
+    let processedCombinedSummary = [];
+    
+    let activeTab = 'COMBINED';
+    let activePrefixFilter = 'ALL';
+    
+    let sortColumnIndex = 0;
+    let sortAscending = true;
+    let confirmResolver = null;
+
+    function askConfirm(title, message, okLabel = 'Delete') {
+      return new Promise((resolve) => {
+        const modal = document.getElementById('confirmModal');
+        const titleEl = document.getElementById('confirmTitle');
+        const msgEl = document.getElementById('confirmMessage');
+        const okBtn = document.getElementById('confirmOkBtn');
+        const cancelBtn = document.getElementById('confirmCancelBtn');
+        if (!modal || !titleEl || !msgEl || !okBtn || !cancelBtn) {
+          resolve(window.confirm(`${title}\n\n${message}`));
+          return;
+        }
+
+        titleEl.textContent = title;
+        msgEl.textContent = message;
+        okBtn.textContent = okLabel;
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+
+        confirmResolver = resolve;
+        const finish = (result) => {
+          modal.classList.add('hidden');
+          modal.classList.remove('flex');
+          okBtn.onclick = null;
+          cancelBtn.onclick = null;
+          confirmResolver = null;
+          resolve(result);
+        };
+        okBtn.onclick = () => finish(true);
+        cancelBtn.onclick = () => finish(false);
+        modal.onclick = (e) => { if (e.target === modal) finish(false); };
+      });
+    }
+
+    // Default Prefix Mapping Rules (From raw Col A prefix -> To full output label)
+    const defaultPrefixMappings = [
+      { from: 'BAYPH', to: 'BAYPH' },
+      { from: 'LUCKO', to: 'LUCKON' },
+      { from: 'LUCKP', to: 'LUCKPH' },
+      { from: 'PROPH', to: 'PROPH' },
+      { from: 'ROLLP', to: 'ROLLPH' },
+      { from: 'SPINH', to: 'SPINHQ' },
+      { from: 'WINMA', to: 'WINMAYA' },
+      { from: 'YESPH', to: 'YESPH' },
+      { from: 'BIGPH', to: 'BIGPH' }
+    ];
+    let prefixMappings = JSON.parse(JSON.stringify(defaultPrefixMappings));
+
+    // Default Gateway Mapping Rules (DISPLAY ONLY - no fee impact)
+    const defaultGatewayMappings = [
+      { from: 'Apollo Pay', to: 'ApolloPay' },
+      { from: 'Dumpling Pay PH', to: 'Dumpling Pay PH' },
+      { from: 'GCash Pay', to: 'GCASHPAY' },
+      { from: 'JayaPay PH', to: 'JAYAPAY' },
+      { from: 'MM Pay', to: 'MMPay' },
+      { from: 'RM Pay', to: 'RM Pay' },
+      { from: 'SG Pay', to: 'SGPHP' }
+    ];
+    let gatewayMappings = JSON.parse(JSON.stringify(defaultGatewayMappings));
+
+    // PHP FEE RULES with flat fees
+    const defaultFeeRules = [
+      { gateway: 'Apollo Pay', method: 'Paymaya', depFee: 1.0, depFlat: 0, wdFee: 0.0, wdFlat: 0 },
+      { gateway: 'JayaPay PH', method: 'Gcash', depFee: 0.9, depFlat: 0, wdFee: 0.0, wdFlat: 4 },
+      { gateway: 'MM Pay', method: 'Gcash Direct', depFee: 2.2, depFlat: 0, wdFee: 0.0, wdFlat: 0 },
+      { gateway: 'RM Pay', method: 'Gcash Qr', depFee: 2.8, depFlat: 0, wdFee: 0.0, wdFlat: 0 },
+      { gateway: 'SG Pay', method: 'Gcash Qr Native', depFee: 1.85, depFlat: 0, wdFee: 0.0, wdFlat: 5 },
+      { gateway: 'RM Pay', method: 'Paymaya', depFee: 1.0, depFlat: 0, wdFee: 0.0, wdFlat: 0 },
+      { gateway: 'Apollo Pay', method: 'Gcash', depFee: 3.0, depFlat: 0, wdFee: 0.0, wdFlat: 0 },
+      { gateway: 'RM Pay', method: 'Gcash', depFee: 2.8, depFlat: 0, wdFee: 0.0, wdFlat: 0 },
+      { gateway: 'SG Pay', method: 'Gcash', depFee: 1.85, depFlat: 0, wdFee: 0.0, wdFlat: 5 },
+      { gateway: 'MM Pay', method: 'Gcash', depFee: 1.1, depFlat: 5, wdFee: 0.0, wdFlat: 0 },
+      { gateway: 'Apollo Pay', method: 'Gcash Qr', depFee: 3.0, depFlat: 0, wdFee: 0.0, wdFlat: 0 },
+      { gateway: 'MM Pay', method: 'Paymaya', depFee: 0.6, depFlat: 0, wdFee: 0.0, wdFlat: 0 },
+      { gateway: 'MISC Gateway', method: 'All', depFee: 0.0, depFlat: 0, wdFee: 0.0, wdFlat: 0 },
+      { gateway: 'Dumpling Pay PH', method: 'Gcash Qr', depFee: 2.9, depFlat: 0, wdFee: 0.5, wdFlat: 0 },
+      { gateway: 'Dumpling Pay PH', method: 'Gcash', depFee: 2.9, depFlat: 0, wdFee: 0.5, wdFlat: 0 },
+      { gateway: 'GCash Pay', method: 'Maya Business', depFee: 1.9, depFlat: 5, wdFee: 0.0, wdFlat: 0 },
+      { gateway: 'GCash Pay', method: 'Gcash', depFee: 1.9, depFlat: 5, wdFee: 0.0, wdFlat: 0 },
+      { gateway: 'MM Pay', method: 'Maya Business', depFee: 2.0, depFlat: 5, wdFee: 0.0, wdFlat: 0 },
+      { gateway: 'AkePay MX', method: 'Clabe', depFee: 0.0, depFlat: 0, wdFee: 0.0, wdFlat: 0 },
+      { gateway: 'Toppay Mexico', method: 'Bank Transfer', depFee: 0.0, depFlat: 0, wdFee: 0.0, wdFlat: 0 },
+      { gateway: 'AkePay MX', method: 'Clabe Reused', depFee: 0.0, depFlat: 0, wdFee: 0.0, wdFlat: 0 }
+    ];
+    
+    let feeRules = JSON.parse(JSON.stringify(defaultFeeRules));
+
+    // Default Accounts List & Per-Account State Management (PHP & PK only)
+    const defaultAccounts = [
+      {
+        id: 'php',
+        name: 'PHP',
+        type: 'PHP',
+        prefixMappings: JSON.parse(JSON.stringify(defaultPrefixMappings)),
+        gatewayMappings: JSON.parse(JSON.stringify(defaultGatewayMappings)),
+        feeRules: JSON.parse(JSON.stringify(defaultFeeRules))
+      },
+      {
+        id: 'pk',
+        name: 'PK',
+        type: 'PK',
+        prefixMappings: [
+          { from: 'PKJEE', to: 'PKJEET' },
+          { from: 'PKNIC', to: 'PKNICE' },
+          { from: 'PROPK', to: 'PROPK' },
+          { from: 'TEZPK', to: 'TEZPK' }
+        ],
+        gatewayMappings: [
+          { from: 'XPay PK', to: 'XPay PK' },
+          { from: 'GXP Pay PK', to: 'GXP Pay PK' },
+          { from: 'U2C Pay', to: 'U2C Pay' },
+          { from: 'Dumpling Pay PK', to: 'Dumpling Pay PK' },
+          { from: 'All2Pay (new)', to: 'All2Pay (new)' },
+          { from: 'Soda Pay', to: 'Soda Pay' },
+          { from: 'TarsPay PK', to: 'TarsPay PK' }
+        ],
+        feeRules: [
+          { gateway: 'XPay PK', method: 'Easypaisa', depFee: 4.7, depFlat: 0, wdFee: 2.5, wdFlat: 0 },
+          { gateway: 'XPay PK', method: 'Jazz Cash', depFee: 3.5, depFlat: 0, wdFee: 2.5, wdFlat: 0 },
+          { gateway: 'GXP Pay PK', method: 'Easypaisa', depFee: 5.0, depFlat: 0, wdFee: 2.0, wdFlat: 0 },
+          { gateway: 'GXP Pay PK', method: 'Jazz Cash', depFee: 4.0, depFlat: 0, wdFee: 2.0, wdFlat: 0 },
+          { gateway: 'U2C Pay', method: 'Easypaisa', depFee: 4.5, depFlat: 0, wdFee: 1.5, wdFlat: 0 },
+          { gateway: 'U2C Pay', method: 'Jazz Cash', depFee: 2.8, depFlat: 0, wdFee: 1.5, wdFlat: 0 },
+          { gateway: 'Dumpling Pay PK', method: 'Easypaisa', depFee: 8.0, depFlat: 0, wdFee: 3.0, wdFlat: 0 },
+          { gateway: 'Dumpling Pay PK', method: 'Jazz Cash', depFee: 8.0, depFlat: 0, wdFee: 3.0, wdFlat: 0 },
+          { gateway: 'All2Pay (new)', method: 'Easypaisa', depFee: 4.0, depFlat: 0, wdFee: 1.6, wdFlat: 0 },
+          { gateway: 'All2Pay (new)', method: 'Jazz Cash', depFee: 2.0, depFlat: 0, wdFee: 1.6, wdFlat: 0 },
+          { gateway: 'Soda Pay', method: 'Easypaisa', depFee: 6.5, depFlat: 0, wdFee: 3.0, wdFlat: 0 },
+          { gateway: 'Soda Pay', method: 'Jazz Cash', depFee: 5.0, depFlat: 0, wdFee: 3.0, wdFlat: 0 },
+          { gateway: 'TarsPay PK', method: 'Easypaisa', depFee: 0, depFlat: 0, wdFee: 2.5, wdFlat: 0 },
+          { gateway: 'TarsPay PK', method: 'Jazz Cash', depFee: 4, depFlat: 0, wdFee: 2.5, wdFlat: 0 }
+        ]
+      }
+    ];
+
+    let accounts = [];
+    let activeAccountId = 'php';
+
+    function initAccounts() {
+      try {
+        const savedAccounts = localStorage.getItem('phpClosingAccounts');
+        if (savedAccounts) {
+          const parsed = JSON.parse(savedAccounts);
+          // Keep only PHP and PK accounts
+          accounts = parsed.filter(a => a.id === 'php' || a.id === 'pk');
+          if (!accounts.some(a => a.id === 'php')) {
+            accounts.unshift(JSON.parse(JSON.stringify(defaultAccounts[0])));
+          }
+          const pkIndex = accounts.findIndex(a => a.id === 'pk');
+          if (pkIndex === -1) {
+            accounts.push(JSON.parse(JSON.stringify(defaultAccounts[1])));
+          } else {
+            accounts[pkIndex].prefixMappings = JSON.parse(JSON.stringify(defaultAccounts[1].prefixMappings));
+            accounts[pkIndex].gatewayMappings = JSON.parse(JSON.stringify(defaultAccounts[1].gatewayMappings));
+            accounts[pkIndex].feeRules = JSON.parse(JSON.stringify(defaultAccounts[1].feeRules));
+          }
+        } else {
+          accounts = JSON.parse(JSON.stringify(defaultAccounts));
+        }
+
+        const savedActiveId = localStorage.getItem('phpClosingActiveAccountId');
+        if (savedActiveId && (savedActiveId === 'php' || savedActiveId === 'pk')) {
+          activeAccountId = savedActiveId;
+        } else {
+          activeAccountId = 'php';
+        }
+      } catch (e) {
+        accounts = JSON.parse(JSON.stringify(defaultAccounts));
+        activeAccountId = 'php';
+      }
+
+      saveAccountsToStorage();
+      syncActiveAccountState();
+    }
+
+    function saveAccountsToStorage() {
+      try {
+        localStorage.setItem('phpClosingAccounts', JSON.stringify(accounts));
+        localStorage.setItem('phpClosingActiveAccountId', activeAccountId);
+      } catch (e) {}
+    }
+
+    function getActiveAccount() {
+      return accounts.find(a => a.id === activeAccountId) || accounts[0];
+    }
+
+    function syncActiveAccountState() {
+      const activeAcc = getActiveAccount();
+      if (!activeAcc) return;
+
+      prefixMappings = JSON.parse(JSON.stringify(activeAcc.prefixMappings || []));
+      gatewayMappings = JSON.parse(JSON.stringify(activeAcc.gatewayMappings || []));
+      feeRules = JSON.parse(JSON.stringify(activeAcc.feeRules || []));
+
+      const isPK = activeAcc.id === 'pk' || activeAcc.name === 'PK';
+      const closingTitle = isPK ? 'PKR Closing' : 'PHP Closing';
+
+      const titleHeading = document.getElementById('appTitleHeading');
+      if (titleHeading) titleHeading.textContent = closingTitle;
+      document.title = `${closingTitle} — Deposit & Withdrawal Aggregator`;
+
+      const headerLabel = document.getElementById('headerAccountLabel');
+      if (headerLabel) headerLabel.textContent = `Currency: ${activeAcc.name}`;
+
+      const settingsBadge = document.getElementById('settingsAccountBadge');
+      if (settingsBadge) settingsBadge.textContent = activeAcc.name;
+
+      const feeBadge = document.getElementById('feeCountBadge');
+      if (feeBadge) feeBadge.textContent = feeRules.length;
+
+      const mappingBadge = document.getElementById('mappingCountBadge');
+      if (mappingBadge) mappingBadge.textContent = prefixMappings.length + gatewayMappings.length;
+    }
+
+    function saveActiveAccountRules() {
+      const activeAcc = getActiveAccount();
+      if (!activeAcc) return;
+
+      activeAcc.prefixMappings = JSON.parse(JSON.stringify(prefixMappings));
+      activeAcc.gatewayMappings = JSON.parse(JSON.stringify(gatewayMappings));
+      activeAcc.feeRules = JSON.parse(JSON.stringify(feeRules));
+
+      saveAccountsToStorage();
+      syncActiveAccountState();
+    }
+
+    function openAccountModal() {
+      renderAccountModalList();
+      const modal = document.getElementById('accountModal');
+      if (modal) modal.classList.remove('hidden');
+    }
+
+    function closeAccountModal() {
+      const modal = document.getElementById('accountModal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function searchAccount() {
+      const input = document.getElementById('accountSearchInput');
+      const filter = input ? input.value.trim().toLowerCase() : '';
+      renderAccountModalList(filter);
+    }
+
+    function clearAccountSearch() {
+      const input = document.getElementById('accountSearchInput');
+      if (input) input.value = '';
+      renderAccountModalList('');
+    }
+
+    function renderAccountModalList(filterText = '') {
+      const listContainer = document.getElementById('accountModalList');
+      if (!listContainer) return;
+
+      listContainer.innerHTML = '';
+      const filtered = accounts.filter(acc => acc.name.toLowerCase().includes(filterText));
+
+      if (filtered.length === 0) {
+        listContainer.innerHTML = `<div class="px-4 py-4 text-center text-muted">No currency found.</div>`;
+        return;
+      }
+
+      filtered.forEach(acc => {
+        const isSelected = acc.id === activeAccountId;
+        const div = document.createElement('div');
+        div.className = `flex items-center justify-between px-4 py-3 border-b border-line transition ${isSelected ? 'bg-indigo-50/70 dark:bg-indigo-950/40 font-semibold' : 'hover:bg-surface-2'}`;
+        div.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="text-sm ${isSelected ? 'font-bold text-indigo-700 dark:text-indigo-300' : 'font-medium text-ink'}">${escapeHtml(acc.name)}</span>
+            ${isSelected ? '<span class="text-[10px] bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full font-bold">Active</span>' : ''}
+          </div>
+          <button onclick="selectAccount('${acc.id}')" ${isSelected ? 'disabled class="px-4 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-600 bg-slate-50 dark:bg-slate-900/50 text-xs font-semibold cursor-not-allowed"' : 'class="px-4 py-1.5 rounded-lg border border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-500 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-500 dark:hover:text-white text-xs font-bold transition"'}>
+            Choose
+          </button>
+        `;
+        listContainer.appendChild(div);
+      });
+    }
+
+    function selectAccount(accId) {
+      if (accId === activeAccountId) {
+        closeAccountModal();
+        return;
+      }
+      activeAccountId = accId;
+      saveAccountsToStorage();
+      syncActiveAccountState();
+      
+      const activeAcc = getActiveAccount();
+      showToast(`Switched currency to ${activeAcc.name}`);
+
+      closeAccountModal();
+
+      if (depositCSVData.length > 0 || withdrawalCSVData.length > 0) {
+        processData();
+      }
+    }
+
+    // Target Column Indexes (0-based)
+    const DEPOSIT_GROUP_INDEX = 6;
+    const WITHDRAWAL_GROUP_INDEX = 5;
+    const METHOD_INDEX = 7;
+    const DEPOSIT_VALUE_INDEX = 22;
+    const WITHDRAWAL_VALUE_INDEX = 25;
+    const DEPOSIT_COMPLETED_TIME_INDEX = 18;
+    const WITHDRAWAL_COMPLETED_TIME_INDEX = 21;
+
+
+    function applyThemeIcons() {
+      const dark = document.documentElement.classList.contains('dark');
+      const sun = document.getElementById('iconSun');
+      const moon = document.getElementById('iconMoon');
+      if (sun) sun.classList.toggle('hidden', !dark);
+      if (moon) moon.classList.toggle('hidden', dark);
+    }
+
+    function toggleTheme() {
+      const root = document.documentElement;
+      const nextDark = !root.classList.contains('dark');
+      root.classList.toggle('dark', nextDark);
+      try { localStorage.setItem('phpClosingTheme', nextDark ? 'dark' : 'light'); } catch (e) {}
+      applyThemeIcons();
+    }
+
+    // Setup Drag and Drop Event Listeners on Page Load
+    window.addEventListener('DOMContentLoaded', () => {
+      initAccounts();
+      applyThemeIcons();
+      setupDropZone('depositDropZone', (file) => parseCSVFile(file, 'DEPOSIT'));
+      setupDropZone('withdrawalDropZone', (file) => parseCSVFile(file, 'WITHDRAWAL'));
+    });
+
+    function setupDropZone(dropZoneId, fileCallback) {
+      const dropZone = document.getElementById(dropZoneId);
+      if (!dropZone) return;
+
+      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }, false);
+      });
+
+      ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+          dropZone.classList.add('drag-active');
+        }, false);
+      });
+
+      ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+          dropZone.classList.remove('drag-active');
+        }, false);
+      });
+
+      dropZone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt ? dt.files : null;
+        if (files && files.length > 0) {
+          fileCallback(files[0]);
+        }
+      });
+    }
+
+    function handleDepositFileSelect(event) {
+      const file = event.target.files ? event.target.files[0] : null;
+      if (file) parseCSVFile(file, 'DEPOSIT');
+    }
+
+    function handleWithdrawalFileSelect(event) {
+      const file = event.target.files ? event.target.files[0] : null;
+      if (file) parseCSVFile(file, 'WITHDRAWAL');
+    }
+
+    function parseCSVFile(file, type) {
+      Papa.parse(file, {
+        header: false,
+        skipEmptyLines: true,
+        complete: function(results) {
+          if (!results.data || results.data.length === 0) {
+            showToast(`The uploaded ${type} CSV file is empty.`);
+            return;
+          }
+
+          const allRows = results.data;
+          const headers = allRows[0] || [];
+          const rows = allRows.slice(1);
+
+          if (type === 'DEPOSIT') {
+            depositCSVHeaders = headers;
+            depositCSVData = rows;
+            document.getElementById('depositFileNameText').textContent = file.name;
+            document.getElementById('depositFileDetailsText').textContent = `${rows.length} rows`;
+            document.getElementById('depositFileInfoBanner').classList.remove('hidden');
+            showToast(`Loaded Deposit file (${rows.length} rows)`);
+          } else {
+            withdrawalCSVHeaders = headers;
+            withdrawalCSVData = rows;
+            document.getElementById('withdrawalFileNameText').textContent = file.name;
+            document.getElementById('withdrawalFileDetailsText').textContent = `${rows.length} rows`;
+            document.getElementById('withdrawalFileInfoBanner').classList.remove('hidden');
+            showToast(`Loaded Withdrawal file (${rows.length} rows)`);
+          }
+
+          processData();
+        },
+        error: function(err) {
+          showToast(`Error parsing ${type} CSV: ` + err.message);
+        }
+      });
+    }
+
+    function extractPrefixFromColA(colAVal) {
+      let val = (colAVal !== undefined && colAVal !== null) ? String(colAVal).trim() : '';
+      val = val.replace(/^=\s*"?/, '').replace(/"$/, '').trim();
+
+      let prefix = '';
+      const codeMatch = val.match(/^([A-Za-z]+)(?=(FD|FW))/i);
+      if (codeMatch && codeMatch[1]) {
+        prefix = codeMatch[1].toUpperCase();
+      } else {
+        const alphaMatch = val.match(/^([A-Za-z]+)/);
+        prefix = alphaMatch ? alphaMatch[1].toUpperCase() : (val.toUpperCase() || 'N/A');
+      }
+
+      const mapEntry = prefixMappings.find(m => 
+        m.from.toUpperCase() === prefix.toUpperCase() || 
+        m.to.toUpperCase() === prefix.toUpperCase()
+      );
+
+      return mapEntry ? mapEntry.to : prefix;
+    }
+
+    // Gateway mapping for DISPLAY ONLY - uses original gateway for fee calculation
+    function getDisplayGatewayName(originalGateway) {
+      if (!originalGateway) return originalGateway;
+      
+      const gw = originalGateway.trim();
+      const mapEntry = gatewayMappings.find(m => 
+        m.from.toLowerCase() === gw.toLowerCase()
+      );
+      
+      return mapEntry ? mapEntry.to : gw;
+    }
+
+    const GATEWAY_SORT_PRIORITY = [
+      'xpay pk',
+      'gxp pay pk',
+      'u2c pay',
+      'dumpling pay pk',
+      'all2pay (new)',
+      'soda pay',
+      'tarspay pk'
+    ];
+
+    function getGatewaySortOrderIndex(gw) {
+      const g = String(gw || '').trim().toLowerCase();
+      const idx = GATEWAY_SORT_PRIORITY.indexOf(g);
+      return idx !== -1 ? idx : 9999;
+    }
+
+    function compareGatewayDisplayNames(a, b) {
+      const orderA = getGatewaySortOrderIndex(a);
+      const orderB = getGatewaySortOrderIndex(b);
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
+      return String(a || '').localeCompare(String(b || ''));
+    }
+
+    // Fee calculation uses ORIGINAL gateway name (not mapped)
+    function findFeeRule(gatewayName, methodName) {
+      const gw = (gatewayName || '').trim().toLowerCase();
+      const method = (methodName || '').trim().toLowerCase();
+      const normMethod = method.replace(/\s+/g, '');
+      
+      let match = feeRules.find(r => 
+        r.gateway.toLowerCase() === gw && 
+        (r.method.toLowerCase() === method || r.method.toLowerCase().replace(/\s+/g, '') === normMethod)
+      );
+      
+      if (!match) {
+        match = feeRules.find(r => r.gateway.toLowerCase() === gw);
+      }
+      
+      if (match) return match;
+      return { gateway: gatewayName, method: methodName || 'All', depFee: 0, depFlat: 0, wdFee: 0, wdFlat: 0 };
+    }
+
+    function processData() {
+      if (!depositCSVData.length && !withdrawalCSVData.length) return;
+
+      const groupMap = new Map();
+      const extractedPrefixes = new Set();
+
+      let grandTotalDeposit = 0;
+      let grandTotalDepositFee = 0;
+      let grandTotalWithdrawal = 0;
+      let grandTotalWithdrawalFee = 0;
+
+      depositCSVData.forEach(row => {
+        const mappedPrefix = extractPrefixFromColA(row[0]);
+        if (mappedPrefix) extractedPrefixes.add(mappedPrefix);
+
+        const originalGateway = (row[DEPOSIT_GROUP_INDEX] !== undefined && row[DEPOSIT_GROUP_INDEX] !== null && String(row[DEPOSIT_GROUP_INDEX]).trim() !== '') 
+          ? String(row[DEPOSIT_GROUP_INDEX]).trim() 
+          : 'Unspecified Gateway';
+
+        const displayGateway = getDisplayGatewayName(originalGateway);
+
+        const method = (row[METHOD_INDEX] !== undefined && row[METHOD_INDEX] !== null && String(row[METHOD_INDEX]).trim() !== '') 
+          ? String(row[METHOD_INDEX]).trim() 
+          : 'All';
+
+        const groupKey = `${mappedPrefix} | ${originalGateway}`;
+
+        const rawValStr = row[DEPOSIT_VALUE_INDEX] ? String(row[DEPOSIT_VALUE_INDEX]).replace(/[\$,]/g, '').trim() : '0';
+        const numVal = parseFloat(rawValStr) || 0;
+
+        const rule = findFeeRule(originalGateway, method);
+        const depFee = (numVal * (rule.depFee / 100)) + (rule.depFlat || 0);
+
+        grandTotalDeposit += numVal;
+        grandTotalDepositFee += depFee;
+
+        if (!groupMap.has(groupKey)) {
+          groupMap.set(groupKey, {
+            key: groupKey,
+            mappedPrefix: mappedPrefix,
+            originalGateway: originalGateway,
+            displayGateway: displayGateway,
+            method: method,
+            depositCount: 0,
+            depositTotal: 0,
+            depositFee: 0,
+            withdrawalCount: 0,
+            withdrawalTotal: 0,
+            withdrawalFee: 0
+          });
+        }
+
+        const g = groupMap.get(groupKey);
+        g.depositCount += 1;
+        g.depositTotal += numVal;
+        g.depositFee += depFee;
+      });
+
+      withdrawalCSVData.forEach(row => {
+        const mappedPrefix = extractPrefixFromColA(row[0]);
+        if (mappedPrefix) extractedPrefixes.add(mappedPrefix);
+
+        const originalGateway = (row[WITHDRAWAL_GROUP_INDEX] !== undefined && row[WITHDRAWAL_GROUP_INDEX] !== null && String(row[WITHDRAWAL_GROUP_INDEX]).trim() !== '') 
+          ? String(row[WITHDRAWAL_GROUP_INDEX]).trim() 
+          : 'Unspecified Gateway';
+
+        const displayGateway = getDisplayGatewayName(originalGateway);
+
+        const method = (row[METHOD_INDEX] !== undefined && row[METHOD_INDEX] !== null && String(row[METHOD_INDEX]).trim() !== '') 
+          ? String(row[METHOD_INDEX]).trim() 
+          : 'All';
+
+        const groupKey = `${mappedPrefix} | ${originalGateway}`;
+
+        const rawValStr = row[WITHDRAWAL_VALUE_INDEX] ? String(row[WITHDRAWAL_VALUE_INDEX]).replace(/[\$,]/g, '').trim() : '0';
+        const numVal = parseFloat(rawValStr) || 0;
+
+        const rule = findFeeRule(originalGateway, method);
+        const wdFee = (numVal * (rule.wdFee / 100)) + (rule.wdFlat || 0);
+
+        grandTotalWithdrawal += numVal;
+        grandTotalWithdrawalFee += wdFee;
+
+        if (!groupMap.has(groupKey)) {
+          groupMap.set(groupKey, {
+            key: groupKey,
+            mappedPrefix: mappedPrefix,
+            originalGateway: originalGateway,
+            displayGateway: displayGateway,
+            method: method,
+            depositCount: 0,
+            depositTotal: 0,
+            depositFee: 0,
+            withdrawalCount: 0,
+            withdrawalTotal: 0,
+            withdrawalFee: 0
+          });
+        }
+
+        const g = groupMap.get(groupKey);
+        g.withdrawalCount += 1;
+        g.withdrawalTotal += numVal;
+        g.withdrawalFee += wdFee;
+      });
+
+      processedCombinedSummary = Array.from(groupMap.values()).map(g => {
+        const totalFees = g.depositFee + g.withdrawalFee;
+        const net = g.depositTotal - g.withdrawalTotal - totalFees;
+        return {
+          key: g.key,
+          mappedPrefix: g.mappedPrefix,
+          originalGateway: g.originalGateway,
+          displayGateway: g.displayGateway,
+          method: g.method,
+          depositCount: g.depositCount,
+          depositTotal: g.depositTotal,
+          depositFee: g.depositFee,
+          withdrawalCount: g.withdrawalCount,
+          withdrawalTotal: g.withdrawalTotal,
+          withdrawalFee: g.withdrawalFee,
+          totalFees: totalFees,
+          netBalance: net
+        };
+      });
+
+      document.getElementById('metricsPanel').classList.remove('hidden');
+      document.getElementById('resultsPanel').classList.remove('hidden');
+
+      updateMetricsCard(grandTotalDeposit, grandTotalDepositFee, grandTotalWithdrawal, grandTotalWithdrawalFee, processedCombinedSummary.length);
+      renderPrefixFilterPills(Array.from(extractedPrefixes).sort());
+      renderGroupedTable();
+    }
+
+    function setActiveTab(tab) {
+      activeTab = tab;
+
+      const btnCombined = document.getElementById('tabBtnCombined');
+      const btnDeposit = document.getElementById('tabBtnDeposit');
+      const btnWithdrawal = document.getElementById('tabBtnWithdrawal');
+
+      const activeClass = 'px-3 py-1.5 text-xs font-semibold rounded-lg transition tab-active';
+      const inactiveClass = 'px-3 py-1.5 text-xs font-semibold rounded-lg transition tab-idle';
+
+      if (btnCombined) btnCombined.className = (tab === 'COMBINED') ? activeClass : inactiveClass;
+      if (btnDeposit) btnDeposit.className = (tab === 'DEPOSIT') ? activeClass : inactiveClass;
+      if (btnWithdrawal) btnWithdrawal.className = (tab === 'WITHDRAWAL') ? activeClass : inactiveClass;
+
+      sortColumnIndex = 0;
+      sortAscending = true;
+      renderGroupedTable();
+    }
+
+    function renderGroupedTable() {
+      const thead = document.getElementById('groupedTableHead');
+      const tbody = document.getElementById('groupedTableBody');
+      const filterInput = document.getElementById('tableFilterInput');
+      const filterText = filterInput ? filterInput.value.toLowerCase() : '';
+
+      if (activeTab === 'COMBINED') {
+        thead.innerHTML = `
+          <tr class="table-head-row text-[11px] font-bold uppercase tracking-wider">
+            <th class="py-3 px-3 cursor-pointer" onclick="sortGroupTable(0)">Gateway <span id="sortIcon0">↑</span></th>
+            <th class="py-3 px-3 cursor-pointer" onclick="sortGroupTable(1)">Mapped Label <span id="sortIcon1">↕</span></th>
+            <th class="py-3 px-3 cursor-pointer text-right" onclick="sortGroupTable(2)">Deposit Count <span id="sortIcon2">↕</span></th>
+            <th class="py-3 px-3 cursor-pointer text-right" onclick="sortGroupTable(3)">Deposit Total <span id="sortIcon3">↕</span></th>
+            <th class="py-3 px-3 cursor-pointer text-right" onclick="sortGroupTable(4)">Dep Fee <span id="sortIcon4">↕</span></th>
+            <th class="py-3 px-3 cursor-pointer text-right" onclick="sortGroupTable(5)">Withdrawal Count <span id="sortIcon5">↕</span></th>
+            <th class="py-3 px-3 cursor-pointer text-right" onclick="sortGroupTable(6)">Withdrawal Total <span id="sortIcon6">↕</span></th>
+            <th class="py-3 px-3 cursor-pointer text-right" onclick="sortGroupTable(7)">Wth Fee <span id="sortIcon7">↕</span></th>
+            <th class="py-3 px-3 cursor-pointer text-right" onclick="sortGroupTable(8)">Total Fees <span id="sortIcon8">↕</span></th>
+          </tr>
+        `;
+      } else if (activeTab === 'DEPOSIT') {
+        thead.innerHTML = `
+          <tr class="table-head-row text-[11px] font-bold uppercase tracking-wider">
+            <th class="py-3 px-3 cursor-pointer" onclick="sortGroupTable(0)">Gateway <span id="sortIcon0">↑</span></th>
+            <th class="py-3 px-3 cursor-pointer" onclick="sortGroupTable(1)">Mapped Label <span id="sortIcon1">↕</span></th>
+            <th class="py-3 px-3 cursor-pointer text-right" onclick="sortGroupTable(2)">Rows <span id="sortIcon2">↕</span></th>
+            <th class="py-3 px-3 cursor-pointer text-right" onclick="sortGroupTable(3)">Total <span id="sortIcon3">↕</span></th>
+            <th class="py-3 px-3 cursor-pointer text-right" onclick="sortGroupTable(4)">Fee <span id="sortIcon4">↕</span></th>
+            <th class="py-3 px-3 cursor-pointer text-right" onclick="sortGroupTable(5)">Net <span id="sortIcon5">↕</span></th>
+          </tr>
+        `;
+      } else {
+        thead.innerHTML = `
+          <tr class="table-head-row text-[11px] font-bold uppercase tracking-wider">
+            <th class="py-3 px-3 cursor-pointer" onclick="sortGroupTable(0)">Gateway <span id="sortIcon0">↑</span></th>
+            <th class="py-3 px-3 cursor-pointer" onclick="sortGroupTable(1)">Mapped Label <span id="sortIcon1">↕</span></th>
+            <th class="py-3 px-3 cursor-pointer text-right" onclick="sortGroupTable(2)">Rows <span id="sortIcon2">↕</span></th>
+            <th class="py-3 px-3 cursor-pointer text-right" onclick="sortGroupTable(3)">Total <span id="sortIcon3">↕</span></th>
+            <th class="py-3 px-3 cursor-pointer text-right" onclick="sortGroupTable(4)">Fee <span id="sortIcon4">↕</span></th>
+            <th class="py-3 px-3 cursor-pointer text-right" onclick="sortGroupTable(5)">Gross <span id="sortIcon5">↕</span></th>
+          </tr>
+        `;
+      }
+
+      const sortedData = [...processedCombinedSummary].sort((a, b) => {
+        let valA, valB;
+        if (sortColumnIndex === 0) {
+          const cmp = compareGatewayDisplayNames(a.displayGateway, b.displayGateway);
+          if (cmp !== 0) return sortAscending ? cmp : -cmp;
+          return a.mappedPrefix.localeCompare(b.mappedPrefix);
+        } else if (sortColumnIndex === 1) {
+          const cmp = a.mappedPrefix.localeCompare(b.mappedPrefix);
+          if (cmp !== 0) return sortAscending ? cmp : -cmp;
+          return compareGatewayDisplayNames(a.displayGateway, b.displayGateway);
+        } else if (activeTab === 'COMBINED') {
+          if (sortColumnIndex === 2) { valA = a.depositCount; valB = b.depositCount; }
+          else if (sortColumnIndex === 3) { valA = a.depositTotal; valB = b.depositTotal; }
+          else if (sortColumnIndex === 4) { valA = a.depositFee; valB = b.depositFee; }
+          else if (sortColumnIndex === 5) { valA = a.withdrawalCount; valB = b.withdrawalCount; }
+          else if (sortColumnIndex === 6) { valA = a.withdrawalTotal; valB = b.withdrawalTotal; }
+          else if (sortColumnIndex === 7) { valA = a.withdrawalFee; valB = b.withdrawalFee; }
+          else if (sortColumnIndex === 8) { valA = a.totalFees; valB = b.totalFees; }
+        } else if (activeTab === 'DEPOSIT') {
+          if (sortColumnIndex === 2) { valA = a.depositCount; valB = b.depositCount; }
+          else if (sortColumnIndex === 3) { valA = a.depositTotal; valB = b.depositTotal; }
+          else if (sortColumnIndex === 4) { valA = a.depositFee; valB = b.depositFee; }
+          else if (sortColumnIndex === 5) { valA = a.depositTotal - a.depositFee; valB = b.depositTotal - b.depositFee; }
+        } else {
+          if (sortColumnIndex === 2) { valA = a.withdrawalCount; valB = b.withdrawalCount; }
+          else if (sortColumnIndex === 3) { valA = a.withdrawalTotal; valB = b.withdrawalTotal; }
+          else if (sortColumnIndex === 4) { valA = a.withdrawalFee; valB = b.withdrawalFee; }
+          else if (sortColumnIndex === 5) { valA = a.withdrawalTotal + a.withdrawalFee; valB = b.withdrawalTotal + b.withdrawalFee; }
+        }
+
+        if (valA < valB) return sortAscending ? -1 : 1;
+        if (valA > valB) return sortAscending ? 1 : -1;
+        return 0;
+      });
+
+      const filtered = sortedData.filter(item => {
+        const matchesSearch = item.key.toLowerCase().includes(filterText) || 
+                              item.displayGateway.toLowerCase().includes(filterText) || 
+                              item.mappedPrefix.toLowerCase().includes(filterText);
+        const matchesPrefix = activePrefixFilter === 'ALL' || item.mappedPrefix === activePrefixFilter;
+        return matchesSearch && matchesPrefix;
+      });
+
+      tbody.innerHTML = '';
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center py-6 text-muted">No matching gateway groups found.</td></tr>`;
+        return;
+      }
+
+      filtered.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.className = 'table-body-row last:border-b-0';
+
+        if (activeTab === 'COMBINED') {
+          tr.innerHTML = `
+            <td class="py-3 px-3 font-semibold text-ink">${escapeHtml(row.displayGateway)}</td>
+            <td class="py-3 px-3">
+              <span class="px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-teal-50 text-teal-800 border border-teal-100 dark:bg-teal-950/50 dark:text-teal-300 dark:border-teal-800">${escapeHtml(row.mappedPrefix)}</span>
+            </td>
+            <td class="py-3 px-3 text-right text-muted">${row.depositCount.toLocaleString()}</td>
+            <td class="py-3 px-3 text-right font-medium text-emerald-600 dark:text-emerald-400">${row.depositTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td class="py-3 px-3 text-right font-medium text-amber-600 dark:text-amber-400">${row.depositFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td class="py-3 px-3 text-right text-muted">${row.withdrawalCount.toLocaleString()}</td>
+            <td class="py-3 px-3 text-right font-medium text-rose-600 dark:text-rose-400">${row.withdrawalTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td class="py-3 px-3 text-right font-medium text-amber-600 dark:text-amber-400">${row.withdrawalFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td class="py-3 px-3 text-right font-bold text-amber-700 dark:text-amber-300">${row.totalFees.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+          `;
+        } else if (activeTab === 'DEPOSIT') {
+          const netDep = row.depositTotal - row.depositFee;
+          tr.innerHTML = `
+            <td class="py-3 px-3 font-semibold text-ink">${escapeHtml(row.displayGateway)}</td>
+            <td class="py-3 px-3">
+              <span class="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800">${escapeHtml(row.mappedPrefix)}</span>
+            </td>
+            <td class="py-3 px-3 text-right text-muted">${row.depositCount.toLocaleString()}</td>
+            <td class="py-3 px-3 text-right font-bold text-emerald-600 dark:text-emerald-400">${row.depositTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td class="py-3 px-3 text-right font-medium text-amber-600 dark:text-amber-400">${row.depositFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td class="py-3 px-3 text-right font-bold text-emerald-700 dark:text-emerald-300">${netDep.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+          `;
+        } else {
+          const grossWd = row.withdrawalTotal + row.withdrawalFee;
+          tr.innerHTML = `
+            <td class="py-3 px-3 font-semibold text-ink">${escapeHtml(row.displayGateway)}</td>
+            <td class="py-3 px-3">
+              <span class="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-800">${escapeHtml(row.mappedPrefix)}</span>
+            </td>
+            <td class="py-3 px-3 text-right text-muted">${row.withdrawalCount.toLocaleString()}</td>
+            <td class="py-3 px-3 text-right font-bold text-rose-600 dark:text-rose-400">${row.withdrawalTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td class="py-3 px-3 text-right font-medium text-amber-600 dark:text-amber-400">${row.withdrawalFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td class="py-3 px-3 text-right font-bold text-rose-700 dark:text-rose-300">${grossWd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+          `;
+        }
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    function sortGroupTable(colIndex) {
+      if (sortColumnIndex === colIndex) {
+        sortAscending = !sortAscending;
+      } else {
+        sortColumnIndex = colIndex;
+        sortAscending = (colIndex === 0 || colIndex === 1);
+      }
+      renderGroupedTable();
+    }
+
+    function filterGroupTable() {
+      renderGroupedTable();
+    }
+
+    function updateMetricsCard(grandTotalDeposit, grandTotalDepositFee, grandTotalWithdrawal, grandTotalWithdrawalFee, groupCount) {
+      const depEl = document.getElementById('statGrandTotalDeposit');
+      const depFeeEl = document.getElementById('statTotalDepositFee');
+      const wthEl = document.getElementById('statGrandTotalWithdrawal');
+      const wthFeeEl = document.getElementById('statTotalWithdrawalFee');
+      const feeEl = document.getElementById('statTotalFees');
+      const netEl = document.getElementById('statNetBalance');
+      const countEl = document.getElementById('statGroupCount');
+
+      const totalFees = grandTotalDepositFee + grandTotalWithdrawalFee;
+      const net = grandTotalDeposit - grandTotalWithdrawal - totalFees;
+
+      if (depEl) depEl.textContent = grandTotalDeposit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      if (depFeeEl) depFeeEl.textContent = grandTotalDepositFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      if (wthEl) wthEl.textContent = grandTotalWithdrawal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      if (wthFeeEl) wthFeeEl.textContent = grandTotalWithdrawalFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      if (feeEl) feeEl.textContent = totalFees.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      if (netEl) {
+        netEl.textContent = net.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        netEl.className = net >= 0 ? "stat-value text-lg font-extrabold text-teal-700 dark:text-teal-400 mt-1" : "stat-value text-lg font-extrabold text-rose-600 dark:text-rose-400 mt-1";
+      }
+      if (countEl) countEl.textContent = groupCount.toLocaleString();
+    }
+
+    function renderPrefixFilterPills(prefixes) {
+      const list = document.getElementById('prefixPillsList');
+      if (!list) return;
+
+      list.innerHTML = '';
+      
+      const allBtn = document.createElement('button');
+      allBtn.onclick = () => setPrefixFilter('ALL');
+      allBtn.className = `px-2.5 py-1 rounded-lg font-mono text-xs font-semibold transition ${activePrefixFilter === 'ALL' ? 'bg-teal-600 text-white' : 'bg-surface-2 text-muted border border-line hover:text-ink'}`;
+      allBtn.textContent = 'ALL';
+      list.appendChild(allBtn);
+
+      prefixes.forEach(p => {
+        const btn = document.createElement('button');
+        btn.onclick = () => setPrefixFilter(p);
+        btn.className = `px-2.5 py-1 rounded-lg font-mono text-xs font-semibold transition ${activePrefixFilter === p ? 'bg-teal-600 text-white' : 'bg-surface-2 text-muted border border-line hover:text-ink'}`;
+        btn.textContent = p;
+        list.appendChild(btn);
+      });
+    }
+
+    function setPrefixFilter(prefix) {
+      activePrefixFilter = prefix;
+      renderGroupedTable();
+      const prefixes = Array.from(new Set(processedCombinedSummary.map(s => s.mappedPrefix))).sort();
+      renderPrefixFilterPills(prefixes);
+    }
+
+    // ============================================================
+    // COPY EXCEL FORMAT FUNCTION
+    // Columns: Prefix | Type | Gateway | Amount | Note  (tab-separated, no blank col)
+    // ============================================================
+    function formatCopyAmount(value) {
+      // Whole number + .0 (e.g. 1032414.33 → 1032414.0)
+      return `${Math.trunc(value)}.0`;
+    }
+
+    function copyRowsToClipboard(rows) {
+      // TSV for Notepad / Sheets; HTML table so Excel splits into real columns
+      const tsv = rows.map(cols => cols.join('\t')).join('\r\n');
+      const html =
+        '<table>' +
+        rows.map(cols =>
+          '<tr>' + cols.map(c => `<td>${escapeHtml(c)}</td>`).join('') + '</tr>'
+        ).join('') +
+        '</table>';
+
+      // Modern Clipboard API with both formats
+      if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem && window.isSecureContext) {
+        const item = new ClipboardItem({
+          'text/plain': new Blob([tsv], { type: 'text/plain' }),
+          'text/html': new Blob([html], { type: 'text/html' })
+        });
+        return navigator.clipboard.write([item]);
+      }
+
+      // Fallback: hidden contenteditable with a real <table> (best for Excel)
+      return new Promise((resolve, reject) => {
+        const holder = document.createElement('div');
+        holder.contentEditable = 'true';
+        holder.style.cssText = 'position:fixed;left:-9999px;top:0;';
+        holder.innerHTML = html;
+        document.body.appendChild(holder);
+
+        const range = document.createRange();
+        range.selectNodeContents(holder);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+
+        try {
+          const ok = document.execCommand('copy');
+          sel.removeAllRanges();
+          document.body.removeChild(holder);
+          ok ? resolve() : reject(new Error('copy failed'));
+        } catch (e) {
+          document.body.removeChild(holder);
+          reject(e);
+        }
+      });
+    }
+
+    function copyExcelFormat() {
+      if (!processedCombinedSummary.length) {
+        showToast('No data to copy. Please upload CSV files first.', 'warning');
+        return;
+      }
+
+      // Each row = [prefix, type, gateway, amount, note]
+      const rows = [];
+
+      // Sort by Gateway first, then Mapped Label (prefix)
+      const sortedRows = [...processedCombinedSummary].sort((a, b) => {
+        const g = compareGatewayDisplayNames(a.displayGateway, b.displayGateway);
+        if (g !== 0) return g;
+        return a.mappedPrefix.localeCompare(b.mappedPrefix);
+      });
+
+      // PG Expenses prefix: PROPK for PK, WINMAYA for PHP
+      const pgExpensesPrefix = activeAccountId === 'pk' ? 'PROPK' : 'WINMAYA';
+
+      // Aggregate PG fees per gateway
+      const gatewayMap = new Map();
+      processedCombinedSummary.forEach(row => {
+        const gateway = row.displayGateway;
+        const depositFee = row.depositFee || 0;
+        const withdrawalFee = row.withdrawalFee || 0;
+        const totalFees = depositFee + withdrawalFee;
+
+        if (totalFees > 0) {
+          if (!gatewayMap.has(gateway)) {
+            gatewayMap.set(gateway, { depFee: 0, wdFee: 0, totalFee: 0 });
+          }
+          const g = gatewayMap.get(gateway);
+          g.depFee += depositFee;
+          g.wdFee += withdrawalFee;
+          g.totalFee += totalFees;
+        }
+      });
+
+      // Emit Deposit/Withdrawal grouped by gateway, then that gateway's PG Expenses
+      let lastGateway = null;
+      const flushPg = (gateway) => {
+        const fees = gatewayMap.get(gateway);
+        if (!fees || fees.totalFee <= 0) return;
+
+        const hasDp = fees.depFee > 0;
+        const hasWd = fees.wdFee > 0;
+        let note = '';
+        if (hasDp && hasWd) {
+          const dp = (-fees.depFee).toFixed(2);
+          const wd = (-fees.wdFee).toFixed(2);
+          const total = fees.totalFee.toFixed(2);
+          note = `DP FEE : ${dp} + WD FEE : ${wd} = TOTAL FEE : ${total}`;
+        } else if (hasDp) {
+          note = `TOTAL  DP FEE : ${(-fees.depFee).toFixed(2)}`;
+        } else if (hasWd) {
+          note = `TOTAL  WD FEE : ${(-fees.wdFee).toFixed(2)}`;
+        }
+
+        rows.push([pgExpensesPrefix, '', 'PG Expenses', gateway, formatCopyAmount(-fees.totalFee), note]);
+        gatewayMap.delete(gateway);
+      };
+
+      sortedRows.forEach(row => {
+        const prefix = row.mappedPrefix;
+        const gateway = row.displayGateway;
+        const depositTotal = row.depositTotal;
+        const withdrawalTotal = row.withdrawalTotal;
+
+        if (lastGateway !== null && gateway !== lastGateway) {
+          flushPg(lastGateway);
+        }
+        lastGateway = gateway;
+
+        if (depositTotal > 0) {
+          const hasDecimal = Math.abs(depositTotal % 1) > 1e-9;
+          const note = hasDecimal ? `BO BAL ${depositTotal.toFixed(2)}` : '';
+          rows.push([prefix, '', 'Deposit', gateway, formatCopyAmount(depositTotal), note]);
+        }
+
+        if (withdrawalTotal > 0) {
+          rows.push([prefix, '', 'Withdrawal', gateway, formatCopyAmount(-withdrawalTotal), '']);
+        }
+      });
+
+      if (lastGateway !== null) flushPg(lastGateway);
+      // Any remaining gateways that only had fees
+      [...gatewayMap.keys()].sort(compareGatewayDisplayNames).forEach(flushPg);
+
+      copyRowsToClipboard(rows).then(() => {
+        showToast(`Copied ${rows.length} rows in Excel format!`);
+      }).catch(() => {
+        showToast('Copy failed. Please try again.');
+      });
+    }
+
+    // ============================================================
+    // COPY DP/WD COUNT REPORT (text format for closing chat)
+    // ============================================================
+    const COUNT_REPORT_GATEWAYS_PHP = [
+      { label: 'WINGPAY (SUSPENDED)', match: ['wingpay', 'wing pay'] },
+      { label: 'Goal Pay', match: ['goal pay', 'goalpay'] },
+      { label: 'MMPAY', match: ['mmpay', 'mm pay'] },
+      { label: 'RMPay', match: ['rmpay', 'rm pay'] },
+      { label: 'JILIWJ (SUSPENDED)', match: ['jiliwj', 'jili wj'] },
+      { label: 'SGPAY', match: ['sgpay', 'sg pay', 'sgphp'] },
+      { label: 'VCPay Direct', match: ['vcpay direct', 'vc pay direct'] },
+      { label: 'VCPay Native', match: ['vcpay native', 'vc pay native'] },
+      { label: 'GCASHPay', match: ['gcashpay', 'gcash pay', 'g cash pay'] },
+      { label: 'SHUNFA PMP', match: ['shunfa pmp', 'shun fa pmp'] },
+      { label: 'SHUNFA Gcash', match: ['shunfa gcash', 'shun fa gcash'] },
+      { label: 'CAIFUN Pay', match: ['caifun pay', 'caifun', 'cai fun pay'] },
+      { label: 'JAYAPAY', match: ['jayapay', 'jaya pay', 'jayapay ph'] },
+      { label: 'Dumpling Pay PH', match: ['dumpling pay ph', 'dumpling pay'] },
+      { label: 'Apollo Pay', match: ['apollo pay', 'apollopay'] }
+    ];
+
+    const COUNT_REPORT_GATEWAYS_PK = [
+      { label: 'XPay PK', match: ['xpay pk', 'xpaypk'] },
+      { label: 'GXP Pay PK', match: ['gxp pay pk', 'gxppaypk'] },
+      { label: 'U2C Pay', match: ['u2c pay', 'u2cpay'] },
+      { label: 'Dumpling Pay PK', match: ['dumpling pay pk', 'dumplingpaypk'] },
+      { label: 'All2Pay (new)', match: ['all2pay (new)', 'all2pay(new)', 'all2pay', 'all 2 pay'] },
+      { label: 'Soda Pay', match: ['soda pay', 'sodapay'] },
+      { label: 'TarsPay PK', match: ['tarspay pk', 'tarspaypk', 'tarspay'] }
+    ];
+
+    function normalizeGwKey(name) {
+      return String(name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    }
+
+    function formatClosingDate(date) {
+      const d = date.getDate();
+      const ord = (d % 10 === 1 && d !== 11) ? 'st'
+        : (d % 10 === 2 && d !== 12) ? 'nd'
+        : (d % 10 === 3 && d !== 13) ? 'rd' : 'th';
+      const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+      return `${d}${ord} ${months[date.getMonth()]} ${date.getFullYear()}`;
+    }
+
+    function findCompletedTimeColumnIndex(headers, fallbackIndex) {
+      if (headers && headers.length) {
+        const idx = headers.findIndex(h =>
+          String(h || '').trim().toLowerCase() === 'completed time'
+        );
+        if (idx >= 0) return idx;
+      }
+      return fallbackIndex;
+    }
+
+    function parseCompletedTimeValue(raw) {
+      if (raw === undefined || raw === null) return null;
+      let s = String(raw).trim();
+      if (!s) return null;
+      // Strip Excel-style ="..." wrappers if present
+      if (s.startsWith('="') && s.endsWith('"')) s = s.slice(2, -1);
+      s = s.replace(/^"|"$/g, '');
+
+      // Prefer YYYY-MM-DD HH:mm:ss (platform export format)
+      const m = s.match(/(\d{4})-(\d{2})-(\d{2})/);
+      if (m) {
+        return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+      }
+
+      const d = new Date(s);
+      return isNaN(d.getTime()) ? null : d;
+    }
+
+    function getClosingDateFromCompletedTime() {
+      const dateCounts = new Map();
+
+      const collect = (rows, headers, fallbackIdx) => {
+        const colIdx = findCompletedTimeColumnIndex(headers, fallbackIdx);
+        rows.forEach(row => {
+          const d = parseCompletedTimeValue(row[colIdx]);
+          if (!d) return;
+          const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+          if (!dateCounts.has(key)) dateCounts.set(key, { date: d, count: 0 });
+          dateCounts.get(key).count += 1;
+        });
+      };
+
+      collect(depositCSVData, depositCSVHeaders, DEPOSIT_COMPLETED_TIME_INDEX);
+      collect(withdrawalCSVData, withdrawalCSVHeaders, WITHDRAWAL_COMPLETED_TIME_INDEX);
+
+      if (!dateCounts.size) return new Date();
+
+      // Use the most common Completed Time calendar date
+      let best = null;
+      for (const entry of dateCounts.values()) {
+        if (!best || entry.count > best.count) best = entry;
+      }
+      return best.date;
+    }
+
+    function copyPlainText(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText && window.isSecureContext) {
+        return navigator.clipboard.writeText(text);
+      }
+      return new Promise((resolve, reject) => {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.setAttribute('readonly', '');
+        textarea.style.cssText = 'position:fixed;left:-9999px;top:0;';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        try {
+          const ok = document.execCommand('copy');
+          document.body.removeChild(textarea);
+          ok ? resolve() : reject(new Error('copy failed'));
+        } catch (e) {
+          document.body.removeChild(textarea);
+          reject(e);
+        }
+      });
+    }
+
+    function openCountReportModal() {
+      // One bucket per original gateway name (sum across all brands)
+      const byOriginal = new Map();
+      if (typeof processedCombinedSummary !== 'undefined' && Array.isArray(processedCombinedSummary)) {
+        processedCombinedSummary.forEach(row => {
+          const key = (row.originalGateway || row.displayGateway || '').trim();
+          if (!key) return;
+          if (!byOriginal.has(key)) {
+            byOriginal.set(key, {
+              original: key,
+              display: row.displayGateway || key,
+              dp: 0,
+              wd: 0
+            });
+          }
+          const b = byOriginal.get(key);
+          b.dp += row.depositCount || 0;
+          b.wd += row.withdrawalCount || 0;
+        });
+      }
+
+      const allBuckets = [...byOriginal.values()];
+
+      const resolveCounts = (matchList) => {
+        const aliasKeys = matchList.map(normalizeGwKey);
+        const matched = allBuckets.filter(b => {
+          const o = normalizeGwKey(b.original);
+          const d = normalizeGwKey(b.display);
+          return aliasKeys.some(a => o === a || d === a || o.includes(a) || a.includes(o) || d.includes(a) || a.includes(d));
+        });
+        return {
+          dp: matched.reduce((s, b) => s + b.dp, 0),
+          wd: matched.reduce((s, b) => s + b.wd, 0),
+          buckets: matched
+        };
+      };
+
+      const used = new Set();
+      const sections = [];
+
+      // Use account-specific gateway template list
+      const gatewayTemplate = activeAccountId === 'pk' ? COUNT_REPORT_GATEWAYS_PK : COUNT_REPORT_GATEWAYS_PHP;
+
+      gatewayTemplate.forEach(gw => {
+        const { dp, wd, buckets } = resolveCounts(gw.match);
+        buckets.forEach(b => used.add(b.original));
+        // If CSV data is uploaded, skip gateways with 0 counts
+        if (allBuckets.length > 0 && dp === 0 && wd === 0) return;
+        sections.push({ label: gw.label, dp, wd });
+      });
+
+      // Gateways present in data but not in the fixed template list
+      allBuckets
+        .filter(b => !used.has(b.original))
+        .filter(b => b.dp !== 0 || b.wd !== 0)
+        .sort((a, b) => a.display.localeCompare(b.display))
+        .forEach(b => {
+          sections.push({ label: b.display, dp: b.dp, wd: b.wd });
+        });
+
+      const modalBody = document.getElementById('crModalBody');
+      modalBody.innerHTML = '';
+
+      // Helper: create a copyable card with a pre + copy button
+      const makeCard = (text, extraClass) => {
+        const card = document.createElement('div');
+        card.className = 'cr-section-card' + (extraClass ? ' ' + extraClass : '');
+        card.style.display = 'flex';
+        card.style.flexDirection = 'row';
+        card.style.alignItems = 'center';
+        card.style.justifyContent = 'space-between';
+        card.style.gap = '1rem';
+
+        const pre = document.createElement('pre');
+        pre.className = 'cr-section-pre';
+        pre.style.fontFamily = '"JetBrains Mono", monospace';
+        pre.style.fontSize = '0.76rem';
+        pre.style.fontWeight = '600';
+        pre.style.color = 'var(--ink)';
+        pre.style.margin = '0';
+        pre.style.lineHeight = '1.45';
+        pre.textContent = text;
+
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-primary cr-copy-btn';
+        btn.textContent = 'Copy';
+        btn.style.flexShrink = '0';
+        btn.addEventListener('click', function() { crCopyText(this, text); });
+
+        card.appendChild(pre);
+        card.appendChild(btn);
+        return card;
+      };
+
+      // Notice if no CSV data uploaded yet
+      if (allBuckets.length === 0) {
+        const notice = document.createElement('div');
+        notice.className = 'cr-empty';
+        notice.style.padding = '0.4rem 0.5rem';
+        notice.style.textAlign = 'left';
+        notice.style.fontSize = '0.72rem';
+        notice.style.color = 'var(--muted)';
+        notice.textContent = '⚠️ No CSV files uploaded yet. Upload CSV files to display non-zero DP/WD counts.';
+        modalBody.appendChild(notice);
+      }
+
+      // Gateway section cards only
+      sections.forEach(s => {
+        const textContent = `${s.label}\nTotal DP : ${s.dp}\nTotal WD : ${s.wd}`;
+        modalBody.appendChild(makeCard(textContent, ''));
+      });
+
+      const modal = document.getElementById('crModal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+      }
+    }
+
+    function closeCountReportModal() {
+      const modal = document.getElementById('crModal');
+      if (modal) {
+        modal.classList.add('hidden');
+      }
+      document.body.style.overflow = '';
+    }
+
+    function crCopyText(btn, text) {
+      copyPlainText(text).then(() => {
+        const orig = btn.textContent;
+        btn.textContent = '✓ Copied!';
+        btn.classList.add('cr-copied');
+        setTimeout(() => { btn.textContent = orig; btn.classList.remove('cr-copied'); }, 1800);
+      }).catch(() => showToast('Copy failed. Please try again.'));
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // ============================================================
+    // SETTINGS & PIN SECURITY (PIN: 9696)
+    // ============================================================
+    const SETTINGS_PIN = '9696';
+    let requestedSettingsTab = 'mappings';
+    let activeSettingsTab = 'mappings';
+
+    function requestSettingsAccess(tab = 'mappings') {
+      requestedSettingsTab = tab;
+      const pinInput = document.getElementById('pinInputField');
+      const pinErr = document.getElementById('pinErrorMessage');
+      if (pinInput) pinInput.value = '';
+      if (pinErr) pinErr.classList.add('hidden');
+
+      const modal = document.getElementById('pinModal');
+      if (modal) {
+        modal.classList.remove('hidden');
+      }
+    }
+
+    function closePinModal() {
+      const modal = document.getElementById('pinModal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function pinKeypadPress(digit) {
+      const pinInput = document.getElementById('pinInputField');
+      const pinErr = document.getElementById('pinErrorMessage');
+      if (pinErr) pinErr.classList.add('hidden');
+      if (!pinInput) return;
+      if (pinInput.value.length < 8) {
+        pinInput.value += digit;
+      }
+      if (pinInput.value.length === 4 && pinInput.value === SETTINGS_PIN) {
+        verifySettingsPin();
+      }
+    }
+
+    function pinKeypadBackspace() {
+      const pinInput = document.getElementById('pinInputField');
+      const pinErr = document.getElementById('pinErrorMessage');
+      if (pinErr) pinErr.classList.add('hidden');
+      if (!pinInput) return;
+      pinInput.value = pinInput.value.slice(0, -1);
+    }
+
+    function pinKeypadClear() {
+      const pinInput = document.getElementById('pinInputField');
+      const pinErr = document.getElementById('pinErrorMessage');
+      if (pinErr) pinErr.classList.add('hidden');
+      if (!pinInput) return;
+      pinInput.value = '';
+    }
+
+    function verifySettingsPin() {
+      const pinInput = document.getElementById('pinInputField');
+      const pinErr = document.getElementById('pinErrorMessage');
+      const enteredPin = pinInput ? pinInput.value.trim() : '';
+
+      if (enteredPin === SETTINGS_PIN) {
+        closePinModal();
+        openSettingsModal(requestedSettingsTab);
+      } else {
+        if (pinErr) pinErr.classList.remove('hidden');
+      }
+    }
+
+    window.addEventListener('keydown', (e) => {
+      const modal = document.getElementById('pinModal');
+      if (!modal || modal.classList.contains('hidden')) return;
+
+      if (e.key >= '0' && e.key <= '9') {
+        e.preventDefault();
+        pinKeypadPress(e.key);
+      } else if (e.key === 'Backspace') {
+        e.preventDefault();
+        pinKeypadBackspace();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        closePinModal();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        verifySettingsPin();
+      }
+    });
+
+    function switchSettingsTab(tab) {
+      activeSettingsTab = tab;
+      const tabMappingsBtn = document.getElementById('settingsTabMappings');
+      const tabFeesBtn = document.getElementById('settingsTabFees');
+      const mappingsSection = document.getElementById('settingsMappingsSection');
+      const feesSection = document.getElementById('settingsFeesSection');
+
+      const activeClass = 'px-3.5 py-1.5 text-xs font-bold rounded-lg transition tab-active flex items-center gap-1.5';
+      const inactiveClass = 'px-3.5 py-1.5 text-xs font-bold rounded-lg transition tab-idle flex items-center gap-1.5';
+
+      if (tab === 'mappings') {
+        if (tabMappingsBtn) tabMappingsBtn.className = activeClass;
+        if (tabFeesBtn) tabFeesBtn.className = inactiveClass;
+        if (mappingsSection) mappingsSection.classList.remove('hidden');
+        if (feesSection) feesSection.classList.add('hidden');
+      } else {
+        if (tabMappingsBtn) tabMappingsBtn.className = inactiveClass;
+        if (tabFeesBtn) tabFeesBtn.className = activeClass;
+        if (mappingsSection) mappingsSection.classList.add('hidden');
+        if (feesSection) feesSection.classList.remove('hidden');
+      }
+    }
+
+    function openSettingsModal(defaultTab = 'mappings') {
+      switchSettingsTab(defaultTab);
+      renderMappingModalTable();
+      renderGatewayMappingModalTable();
+      renderFeeModalTable();
+
+      const modal = document.getElementById('settingsModal');
+      if (modal) modal.classList.remove('hidden');
+    }
+
+    function closeSettingsModal() {
+      const modal = document.getElementById('settingsModal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function resetCurrentSettingsTab() {
+      if (activeSettingsTab === 'mappings') {
+        resetDefaultMappings();
+      } else {
+        resetDefaultFeeRules();
+      }
+    }
+
+    function saveAndApplySettings() {
+      saveActiveAccountRules();
+      closeSettingsModal();
+      processData();
+      showToast(`Applied updated settings for ${getActiveAccount().name}.`);
+    }
+
+    // Aliases for compatibility
+    function openMappingModal() { requestSettingsAccess('mappings'); }
+    function closeMappingModal() { closeSettingsModal(); }
+    function saveAndApplyMappings() { saveAndApplySettings(); }
+    function openFeeModal() { requestSettingsAccess('fees'); }
+    function closeFeeModal() { closeSettingsModal(); }
+    function saveAndApplyFeeRules() { saveAndApplySettings(); }
+
+    // Prefix Mappings
+    function renderMappingModalTable() {
+      const tbody = document.getElementById('mappingModalTableBody');
+      if (!tbody) return;
+
+      tbody.innerHTML = '';
+      prefixMappings.forEach((m, idx) => {
+        const tr = document.createElement('tr');
+        tr.className = 'table-body-row';
+        tr.innerHTML = `
+          <td class="py-2 px-3 text-center text-muted font-semibold">${idx + 1}</td>
+          <td class="py-2 px-3">
+            <input type="text" value="${escapeHtml(m.to)}" title="Click to edit Mapped Label"
+                   onchange="updatePrefixMappingField(${idx}, 'to', this.value)"
+                   class="map-input map-accent">
+          </td>
+          <td class="py-2 px-3">
+            <input type="text" value="${escapeHtml(m.from)}" title="Click to edit Raw Prefix"
+                   onchange="updatePrefixMappingField(${idx}, 'from', this.value)"
+                   class="map-input">
+          </td>
+          <td class="py-2 px-3 text-right space-x-1">
+            <button onclick="movePrefixMappingRule(${idx}, -1)" ${idx === 0 ? 'disabled class="text-muted opacity-40 cursor-not-allowed p-1"' : 'class="text-muted hover:text-ink p-1"'} title="Move up">▲</button>
+            <button onclick="movePrefixMappingRule(${idx}, 1)" ${idx === prefixMappings.length - 1 ? 'disabled class="text-muted opacity-40 cursor-not-allowed p-1"' : 'class="text-muted hover:text-ink p-1"'} title="Move down">▼</button>
+            <button onclick="deletePrefixMappingRule(${idx})" class="text-rose-500 hover:text-rose-400 p-1 font-bold" title="Delete">✕</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      const countBadge = document.getElementById('mappingCountBadge');
+      if (countBadge) countBadge.textContent = prefixMappings.length + gatewayMappings.length;
+    }
+
+    function updatePrefixMappingField(index, field, value) {
+      prefixMappings[index][field] = value.toUpperCase().trim();
+    }
+
+    function addPrefixMappingRule() {
+      const fromVal = document.getElementById('newMapFrom').value.trim().toUpperCase();
+      const toVal = document.getElementById('newMapTo').value.trim().toUpperCase();
+
+      if (!fromVal || !toVal) {
+        showToast('Please enter both original prefix and mapped output label.');
+        return;
+      }
+
+      prefixMappings.push({ from: fromVal, to: toVal });
+      document.getElementById('newMapFrom').value = '';
+      document.getElementById('newMapTo').value = '';
+      renderMappingModalTable();
+      renderGatewayMappingModalTable();
+      showToast(`Added prefix rule: ${fromVal} = ${toVal}`);
+    }
+
+    async function deletePrefixMappingRule(index) {
+      const rule = prefixMappings[index];
+      if (!rule) return;
+      const ok = await askConfirm(
+        'Delete mapped label?',
+        `Remove mapping "${rule.from}" → "${rule.to}"? This cannot be undone until you re-add it.`
+      );
+      if (!ok) return;
+      prefixMappings.splice(index, 1);
+      renderMappingModalTable();
+      renderGatewayMappingModalTable();
+      showToast(`Deleted prefix rule for ${rule.from}`);
+    }
+
+    function movePrefixMappingRule(index, direction) {
+      const targetIndex = index + direction;
+      if (targetIndex < 0 || targetIndex >= prefixMappings.length) return;
+      const temp = prefixMappings[index];
+      prefixMappings[index] = prefixMappings[targetIndex];
+      prefixMappings[targetIndex] = temp;
+      renderMappingModalTable();
+      renderGatewayMappingModalTable();
+    }
+
+    // Gateway Mappings (Display Only)
+    function renderGatewayMappingModalTable() {
+      const tbody = document.getElementById('gatewayMappingModalTableBody');
+      if (!tbody) return;
+
+      tbody.innerHTML = '';
+      gatewayMappings.forEach((m, idx) => {
+        const tr = document.createElement('tr');
+        tr.className = 'table-body-row';
+        tr.innerHTML = `
+          <td class="py-2 px-3 text-center text-muted font-semibold">${idx + 1}</td>
+          <td class="py-2 px-3">
+            <input type="text" value="${escapeHtml(m.to)}" title="Click to edit Display Name"
+                   onchange="updateGatewayMappingField(${idx}, 'to', this.value)"
+                   class="map-input map-accent">
+          </td>
+          <td class="py-2 px-3">
+            <input type="text" value="${escapeHtml(m.from)}" title="Click to edit Raw Gateway"
+                   onchange="updateGatewayMappingField(${idx}, 'from', this.value)"
+                   class="map-input">
+          </td>
+          <td class="py-2 px-3 text-right space-x-1">
+            <button onclick="moveGatewayMappingRule(${idx}, -1)" ${idx === 0 ? 'disabled class="text-muted opacity-40 cursor-not-allowed p-1"' : 'class="text-muted hover:text-ink p-1"'} title="Move up">▲</button>
+            <button onclick="moveGatewayMappingRule(${idx}, 1)" ${idx === gatewayMappings.length - 1 ? 'disabled class="text-muted opacity-40 cursor-not-allowed p-1"' : 'class="text-muted hover:text-ink p-1"'} title="Move down">▼</button>
+            <button onclick="deleteGatewayMappingRule(${idx})" class="text-rose-500 hover:text-rose-400 p-1 font-bold" title="Delete">✕</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      const countBadge = document.getElementById('mappingCountBadge');
+      if (countBadge) countBadge.textContent = prefixMappings.length + gatewayMappings.length;
+    }
+
+    function updateGatewayMappingField(index, field, value) {
+      gatewayMappings[index][field] = value.trim();
+    }
+
+    function addGatewayMappingRule() {
+      const fromVal = document.getElementById('newGatewayMapFrom').value.trim();
+      const toVal = document.getElementById('newGatewayMapTo').value.trim();
+
+      if (!fromVal || !toVal) {
+        showToast('Please enter both raw gateway name and display gateway name.');
+        return;
+      }
+
+      gatewayMappings.push({ from: fromVal, to: toVal });
+      document.getElementById('newGatewayMapFrom').value = '';
+      document.getElementById('newGatewayMapTo').value = '';
+      renderMappingModalTable();
+      renderGatewayMappingModalTable();
+      showToast(`Added gateway display rule: ${fromVal} = ${toVal}`);
+    }
+
+    async function deleteGatewayMappingRule(index) {
+      const rule = gatewayMappings[index];
+      if (!rule) return;
+      const ok = await askConfirm(
+        'Delete gateway mapping?',
+        `Remove mapping "${rule.from}" → "${rule.to}"? This cannot be undone until you re-add it.`
+      );
+      if (!ok) return;
+      gatewayMappings.splice(index, 1);
+      renderMappingModalTable();
+      renderGatewayMappingModalTable();
+      showToast(`Deleted gateway rule for ${rule.from}`);
+    }
+
+    function moveGatewayMappingRule(index, direction) {
+      const targetIndex = index + direction;
+      if (targetIndex < 0 || targetIndex >= gatewayMappings.length) return;
+      const temp = gatewayMappings[index];
+      gatewayMappings[index] = gatewayMappings[targetIndex];
+      gatewayMappings[targetIndex] = temp;
+      renderMappingModalTable();
+      renderGatewayMappingModalTable();
+    }
+
+    async function resetDefaultMappings() {
+      const ok = await askConfirm(
+        'Reset all mappings?',
+        'This will restore default Mapped Label and Gateway mappings. Your custom edits will be lost.',
+        'Reset'
+      );
+      if (!ok) return;
+      const activeAcc = getActiveAccount();
+      const defAcc = defaultAccounts.find(a => a.id === activeAcc.id) || defaultAccounts[0];
+      prefixMappings = JSON.parse(JSON.stringify(defAcc.prefixMappings));
+      gatewayMappings = JSON.parse(JSON.stringify(defAcc.gatewayMappings));
+      saveActiveAccountRules();
+      renderMappingModalTable();
+      renderGatewayMappingModalTable();
+      showToast(`Reset mappings to default for ${activeAcc.name}.`);
+    }
+
+    // Fee Schedule Table & Functions
+    function renderFeeModalTable() {
+      const tbody = document.getElementById('feeModalTableBody');
+      if (!tbody) return;
+
+      tbody.innerHTML = '';
+      feeRules.forEach((r, idx) => {
+        const tr = document.createElement('tr');
+        tr.className = 'table-body-row';
+        tr.innerHTML = `
+          <td class="py-2 px-3">
+            <input type="text" value="${escapeHtml(r.gateway)}" title="Click to edit"
+                   onchange="updateFeeRuleField(${idx}, 'gateway', this.value)"
+                   class="map-input">
+          </td>
+          <td class="py-2 px-3">
+            <input type="text" value="${escapeHtml(r.method || 'All')}" title="Click to edit"
+                   onchange="updateFeeRuleField(${idx}, 'method', this.value)"
+                   class="map-input">
+          </td>
+          <td class="py-2 px-3">
+            <input type="number" step="0.01" value="${r.depFee}" onchange="updateFeeRuleField(${idx}, 'depFee', parseFloat(this.value) || 0)"
+                   class="map-input text-right map-ok">
+          </td>
+          <td class="py-2 px-3">
+            <input type="number" step="0.01" value="${r.depFlat || 0}" onchange="updateFeeRuleField(${idx}, 'depFlat', parseFloat(this.value) || 0)"
+                   class="map-input text-right map-ok">
+          </td>
+          <td class="py-2 px-3">
+            <input type="number" step="0.01" value="${r.wdFee}" onchange="updateFeeRuleField(${idx}, 'wdFee', parseFloat(this.value) || 0)"
+                   class="map-input text-right map-bad">
+          </td>
+          <td class="py-2 px-3">
+            <input type="number" step="0.01" value="${r.wdFlat || 0}" onchange="updateFeeRuleField(${idx}, 'wdFlat', parseFloat(this.value) || 0)"
+                   class="map-input text-right map-bad">
+          </td>
+          <td class="py-2 px-3 text-center">
+            <button onclick="deleteFeeRule(${idx})" class="text-rose-500 hover:text-rose-400 font-bold p-1" title="Delete">✕</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      const badge = document.getElementById('feeCountBadge');
+      if (badge) badge.textContent = feeRules.length;
+    }
+
+    function updateFeeRuleField(index, field, value) {
+      feeRules[index][field] = value;
+    }
+
+    function addFeeRule() {
+      const gw = document.getElementById('newFeeGateway').value.trim();
+      const method = document.getElementById('newFeeMethod').value.trim() || 'All';
+      const depFee = parseFloat(document.getElementById('newFeeDepRate').value) || 0;
+      const depFlat = parseFloat(document.getElementById('newFeeDepFlat').value) || 0;
+      const wdFee = parseFloat(document.getElementById('newFeeWdRate').value) || 0;
+      const wdFlat = parseFloat(document.getElementById('newFeeWdFlat').value) || 0;
+
+      if (!gw) {
+        showToast('Please enter Payment Gateway name.');
+        return;
+      }
+
+      feeRules.push({ gateway: gw, method: method, depFee: depFee, depFlat: depFlat, wdFee: wdFee, wdFlat: wdFlat });
+      document.getElementById('newFeeGateway').value = '';
+      document.getElementById('newFeeMethod').value = '';
+      document.getElementById('newFeeDepRate').value = '';
+      document.getElementById('newFeeDepFlat').value = '';
+      document.getElementById('newFeeWdRate').value = '';
+      document.getElementById('newFeeWdFlat').value = '';
+
+      renderFeeModalTable();
+      showToast(`Added fee rule for ${gw} - ${method}`);
+    }
+
+    async function deleteFeeRule(index) {
+      const rule = feeRules[index];
+      if (!rule) return;
+      const ok = await askConfirm(
+        'Delete fee rule?',
+        `Remove fee rule for "${rule.gateway}" — "${rule.method || 'All'}"?`
+      );
+      if (!ok) return;
+      feeRules.splice(index, 1);
+      renderFeeModalTable();
+      showToast(`Deleted fee rule for ${rule.gateway} - ${rule.method}`);
+    }
+
+    async function resetDefaultFeeRules() {
+      const ok = await askConfirm(
+        'Reset fee schedule?',
+        'This will restore the default fee table. Your custom fee edits will be lost.',
+        'Reset'
+      );
+      if (!ok) return;
+      const activeAcc = getActiveAccount();
+      const defAcc = defaultAccounts.find(a => a.id === activeAcc.id) || defaultAccounts[0];
+      feeRules = JSON.parse(JSON.stringify(defAcc.feeRules));
+      saveActiveAccountRules();
+      renderFeeModalTable();
+      showToast(`Reset fee rules to default for ${activeAcc.name}.`);
+    }
+
+    function exportSummaryCSV() {
+      if (!processedCombinedSummary.length) return;
+
+      const sortedSummary = [...processedCombinedSummary].sort((a, b) => {
+        const g = compareGatewayDisplayNames(a.displayGateway, b.displayGateway);
+        if (g !== 0) return g;
+        return a.mappedPrefix.localeCompare(b.mappedPrefix);
+      });
+
+      let csvContent = 'data:text/csv;charset=utf-8,';
+
+      if (activeTab === 'COMBINED') {
+        csvContent += 'Payment Gateway,Mapped Label (To),Deposit Count,Deposit Total (Col W),Deposit Fee,Withdrawal Count,Withdrawal Total (Col Z),Withdrawal Fee,Total Fees\n';
+        sortedSummary.forEach(row => {
+          csvContent += `"${row.displayGateway.replace(/"/g, '""')}","${row.mappedPrefix.replace(/"/g, '""')}",${row.depositCount},${row.depositTotal.toFixed(2)},${row.depositFee.toFixed(2)},${row.withdrawalCount},${row.withdrawalTotal.toFixed(2)},${row.withdrawalFee.toFixed(2)},${row.totalFees.toFixed(2)}\n`;
+        });
+      } else if (activeTab === 'DEPOSIT') {
+        csvContent += 'Payment Gateway,Mapped Label (To),Deposit Rows,Deposit Total (Col W),Deposit Fee,Net Deposit\n';
+        sortedSummary.forEach(row => {
+          const netDep = row.depositTotal - row.depositFee;
+          csvContent += `"${row.displayGateway.replace(/"/g, '""')}","${row.mappedPrefix.replace(/"/g, '""')}",${row.depositCount},${row.depositTotal.toFixed(2)},${row.depositFee.toFixed(2)},${netDep.toFixed(2)}\n`;
+        });
+      } else {
+        csvContent += 'Payment Gateway,Mapped Label (To),Withdrawal Rows,Withdrawal Total (Col Z),Withdrawal Fee,Gross Withdrawal\n';
+        sortedSummary.forEach(row => {
+          const grossWd = row.withdrawalTotal + row.withdrawalFee;
+          csvContent += `"${row.displayGateway.replace(/"/g, '""')}","${row.mappedPrefix.replace(/"/g, '""')}",${row.withdrawalCount},${row.withdrawalTotal.toFixed(2)},${row.withdrawalFee.toFixed(2)},${grossWd.toFixed(2)}\n`;
+        });
+      }
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute('download', `${activeTab.toLowerCase()}_settlement_summary.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      showToast(`Exported ${activeTab} summary CSV!`);
+    }
+
+    async function resetDepositData() {
+      const ok = await askConfirm(
+        'Clear deposit file?',
+        'This will remove the uploaded deposit CSV and recalculate results.',
+        'Clear'
+      );
+      if (!ok) return;
+      depositCSVData = [];
+      depositCSVHeaders = [];
+      document.getElementById('depositFileInfoBanner').classList.add('hidden');
+      document.getElementById('depositFileInput').value = '';
+      processData();
+    }
+
+    async function resetWithdrawalData() {
+      const ok = await askConfirm(
+        'Clear withdrawal file?',
+        'This will remove the uploaded withdrawal CSV and recalculate results.',
+        'Clear'
+      );
+      if (!ok) return;
+      withdrawalCSVData = [];
+      withdrawalCSVHeaders = [];
+      document.getElementById('withdrawalFileInfoBanner').classList.add('hidden');
+      document.getElementById('withdrawalFileInput').value = '';
+      processData();
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      const toastMessage = document.getElementById('toastMessage');
+      if (!toast || !toastMessage) return;
+
+      toastMessage.textContent = message;
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3000);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+  </script>
+
+  <!-- DP/WD Count Report Popup Modal -->
+  <div id="crModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4" style="background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);" onclick="if(event.target===this) closeCountReportModal()">
+    <div class="cr-modal-panel" style="width:100%;max-width:520px;max-height:88vh;display:flex;flex-direction:column;border-radius:16px;overflow:hidden;">
+      <!-- Modal Header -->
+      <div class="cr-modal-header" style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--line);background:var(--surface);flex-shrink:0;">
+        <div>
+          <div style="font-size:0.85rem;font-weight:700;color:var(--ink);">DP/WD Count Report</div>
+          <div style="font-size:0.7rem;color:var(--muted);margin-top:1px;">Non-zero gateways only</div>
+        </div>
+        <button onclick="closeCountReportModal()" class="btn btn-ghost" style="padding:0.3rem 0.5rem;font-size:1rem;" title="Close">✕</button>
+      </div>
+      <!-- Modal Body -->
+      <div id="crModalBody" style="overflow-y:auto;padding:1rem;display:flex;flex-direction:column;gap:0.65rem;background:var(--bg-base);"></div>
+    </div>
+  </div>
+
+  <style>
+    .cr-modal-panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      box-shadow: 0 24px 60px rgba(0,0,0,0.3);
+    }
+    .cr-section-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 0.75rem 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+    }
+    .cr-header-card, .cr-footer-card {
+      border-color: var(--accent);
+      background: rgba(13,148,136,0.04);
+    }
+    html.dark .cr-header-card, html.dark .cr-footer-card {
+      background: rgba(45,212,191,0.05);
+    }
+    .cr-section-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .cr-section-pre {
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-size: 0.68rem;
+      color: var(--muted);
+      white-space: pre-wrap;
+      margin: 0;
+      line-height: 1.5;
+    }
+    .cr-count-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .cr-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      border-radius: 6px;
+      padding: 0.2rem 0.55rem;
+    }
+    .cr-dp {
+      background: rgba(16,185,129,0.13);
+      color: #059669;
+      border: 1px solid rgba(16,185,129,0.28);
+    }
+    html.dark .cr-dp { color: #34d399; }
+    .cr-wd {
+      background: rgba(244,63,94,0.13);
+      color: #e11d48;
+      border: 1px solid rgba(244,63,94,0.28);
+    }
+    html.dark .cr-wd { color: #fb7185; }
+    .cr-copy-btn {
+      align-self: flex-start;
+      margin-top: 0.1rem;
+      font-size: 0.7rem;
+      padding: 0.38rem 0.75rem;
+      transition: background .15s, transform .1s;
+    }
+    .cr-copy-btn:active { transform: scale(0.96); }
+    .cr-copied {
+      background: #059669 !important;
+      color: #fff !important;
+    }
+    html.dark .cr-copied { background: #34d399 !important; color: #042f2e !important; }
+    .cr-empty {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.78rem;
+      padding: 1.5rem;
+    }
+  </style>
+
+</body>
+</html>
