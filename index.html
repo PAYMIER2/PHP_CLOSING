@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PHP Closing — Deposit & Withdrawal Aggregator</title>
+  <title>PHP/PKR Closing</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
@@ -190,8 +190,8 @@
           </svg>
         </div>
         <div class="min-w-0">
-          <h1 class="text-sm font-bold text-ink leading-tight truncate">PHP Closing</h1>
-          <p class="text-[10px] text-muted truncate">Deposit & withdrawal settlement</p>
+          <h1 class="text-sm font-bold text-ink leading-tight truncate">PHP/PKR Closing</h1>
+          <p class="text-[10px] text-muted truncate">Deposit & withdrawal </p>
         </div>
       </div>
       <div class="flex items-center gap-2 shrink-0">
@@ -666,6 +666,7 @@
           { from: 'Dumpling Pay PK', to: 'Dumpling Pay PK' },
           { from: 'All2Pay (new)', to: 'All2Pay (new)' },
           { from: 'Soda Pay', to: 'Soda Pay' }
+          { from: 'TarsPay PK', to: 'TarsPay PK' }
         ],
         feeRules: [
           { gateway: 'XPay PK', method: 'Easypaisa', depFee: 4.7, depFlat: 0, wdFee: 2.5, wdFlat: 0 },
@@ -679,7 +680,9 @@
           { gateway: 'All2Pay (new)', method: 'Easypaisa', depFee: 4.0, depFlat: 0, wdFee: 1.6, wdFlat: 0 },
           { gateway: 'All2Pay (new)', method: 'Jazz Cash', depFee: 2.0, depFlat: 0, wdFee: 1.6, wdFlat: 0 },
           { gateway: 'Soda Pay', method: 'Easypaisa', depFee: 6.5, depFlat: 0, wdFee: 3.0, wdFlat: 0 },
-          { gateway: 'Soda Pay', method: 'Jazz Cash', depFee: 5.0, depFlat: 0, wdFee: 3.0, wdFlat: 0 }
+          { gateway: 'Soda Pay', method: 'Jazz Cash', depFee: 5.0, depFlat: 0, wdFee: 3.0, wdFlat: 0 },
+          { gateway: 'TarsPay PK', method: 'Easypaisa', depFee: 0, depFlat: 0, wdFee: 2.5, wdFlat: 0 },
+          { gateway: 'TarsPay PK', method: 'Jazz Cash', depFee: 4, depFlat: 0, wdFee: 2.5, wdFlat: 0 }
         ]
       }
     ];
