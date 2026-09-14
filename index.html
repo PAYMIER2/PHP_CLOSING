@@ -659,14 +659,18 @@
     // Default Prefix Mapping Rules (From raw Col A prefix -> To full output label)
     const defaultPrefixMappings = [
       { from: 'BAYPH', to: 'BAYPH' },
-      { from: 'LUCKO', to: 'LUCKON' },
-      { from: 'LUCKP', to: 'LUCKPH' },
       { from: 'PROPH', to: 'PROPH' },
       { from: 'ROLLP', to: 'ROLLPH' },
-      { from: 'SPINH', to: 'SPINHQ' },
-      { from: 'WINMA', to: 'WINMAYA' },
       { from: 'YESPH', to: 'YESPH' },
-      { from: 'BIGPH', to: 'BIGPH' }
+      { from: 'BIGPH', to: 'BIGPH' },
+      { from: 'LUCKP', to: 'LUCKPH' },
+      { from: 'LUCKO', to: 'LUCKON' },
+      { from: 'SPINH', to: 'SPINHQ' },
+      { from: 'FUNHQ', to: 'FUNHQ' },
+      { from: 'WOWHQ', to: 'WOWHQ' },
+      { from: 'WINMA', to: 'WINMAYA' },
+      { from: 'ROLLM', to: 'ROLLMAYA' },
+      { from: 'ACEMA', to: 'ACEMAYA' }
     ];
     let prefixMappings = JSON.parse(JSON.stringify(defaultPrefixMappings));
 
@@ -769,6 +773,9 @@
           accounts = parsed.filter(a => a.id === 'php' || a.id === 'pk');
           if (!accounts.some(a => a.id === 'php')) {
             accounts.unshift(JSON.parse(JSON.stringify(defaultAccounts[0])));
+          } else {
+            const phpIndex = accounts.findIndex(a => a.id === 'php');
+            accounts[phpIndex].prefixMappings = JSON.parse(JSON.stringify(defaultAccounts[0].prefixMappings));
           }
           const pkIndex = accounts.findIndex(a => a.id === 'pk');
           if (pkIndex === -1) {
